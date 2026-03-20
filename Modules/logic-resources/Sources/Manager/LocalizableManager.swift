@@ -388,6 +388,8 @@ final class LocalizableManager: LocalizableManagerType {
       bundle.localizedString(forKey: "category_travel")
     case .changelog:
       bundle.localizedString(forKey: "changelog")
+    case .sourceRepository:
+      bundle.localizedString(forKey: "sourceRepository")
     case .orderBy:
       bundle.localizedString(forKey: "order_by")
     case .filterByCategory:
