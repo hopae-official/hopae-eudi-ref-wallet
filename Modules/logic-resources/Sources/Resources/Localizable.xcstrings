@@ -342,6 +342,17 @@
         }
       }
     },
+    "sourceRepository" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source Repository"
+          }
+        }
+      }
+    },
     "choose_from_list" : {
       "extractionState" : "manual",
       "localizations" : {

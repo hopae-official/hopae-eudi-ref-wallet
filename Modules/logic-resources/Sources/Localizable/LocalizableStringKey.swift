@@ -196,6 +196,7 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case categorySocialSecurity
   case categoryTravel
   case changelog
+  case sourceRepository
   case orderBy
   case filterByCategory
   case searchDocuments
