@@ -160,7 +160,7 @@
       "location" : "https://github.com/lukasjhan/eudi-lib-ios-wallet-kit.git",
       "state" : {
         "branch" : "feat/dcql-null-match-localbuild",
-        "revision" : "d5e09067e0bc147c70a4ba4e8026fbd1e4509b37"
+        "revision" : "1dc27ca4bf4a4e23590173d8abd6afde02267328"
       }
     },
     {

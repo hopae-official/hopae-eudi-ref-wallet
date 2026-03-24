@@ -36,6 +36,7 @@ final class HomeTabViewModel<Router: RouterHost>: ViewModel<Router, HomeTabState
   var isAuthenticateModalShowing: Bool = false
   var isSignDocumentAlertShowing: Bool = false
   var isBleModalShowing: Bool = false
+  var isNoDocumentAlertShowing: Bool = false
 
   init(
     router: Router,
@@ -101,6 +102,12 @@ final class HomeTabViewModel<Router: RouterHost>: ViewModel<Router, HomeTabState
 
   func onShare() {
     Task {
+
+      let documents = await interactor.getWalletKitController().fetchIssuedDocuments()
+      guard !documents.isEmpty else {
+        self.isNoDocumentAlertShowing = true
+        return
+      }
 
       let state = await interactor.getBleAvailability()
 
