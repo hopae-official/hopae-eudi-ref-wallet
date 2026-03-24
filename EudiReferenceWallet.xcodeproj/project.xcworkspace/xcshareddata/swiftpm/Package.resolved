@@ -110,6 +110,15 @@
       }
     },
     {
+      "identity" : "eudi-lib-ios-openid4vp-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/lukasjhan/eudi-lib-ios-openid4vp-swift.git",
+      "state" : {
+        "branch" : "feat/dcql-null-match-localbuild",
+        "revision" : "b60c43ad72e5ddc1ce3d479e83829f695a406602"
+      }
+    },
+    {
       "identity" : "eudi-lib-ios-rqes-csc-swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/eu-digital-identity-wallet/eudi-lib-ios-rqes-csc-swift.git",
@@ -137,15 +146,6 @@
       }
     },
     {
-      "identity" : "eudi-lib-ios-siop-openid4vp-swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/eu-digital-identity-wallet/eudi-lib-ios-siop-openid4vp-swift.git",
-      "state" : {
-        "revision" : "197e36cc8b9147923bd17a9cd558c8d393ad7a63",
-        "version" : "0.30.1"
-      }
-    },
-    {
       "identity" : "eudi-lib-ios-statium-swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/eu-digital-identity-wallet/eudi-lib-ios-statium-swift.git",
@@ -160,7 +160,7 @@
       "location" : "https://github.com/lukasjhan/eudi-lib-ios-wallet-kit.git",
       "state" : {
         "branch" : "feat/dcql-null-match-localbuild",
-        "revision" : "f07122c71076cf5f8576b239d4fd2301025bb0bf"
+        "revision" : "d5e09067e0bc147c70a4ba4e8026fbd1e4509b37"
       }
     },
     {
