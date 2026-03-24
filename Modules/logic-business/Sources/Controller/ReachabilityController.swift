@@ -79,6 +79,8 @@ final class ReachabilityControllerImpl: ReachabilityController, BKAvailabilityOb
 
         self.$bleAvailibity
           .dropFirst()
+          .filter { $0 != .unavailable }
+          .first()
           .sink(
             receiveValue: { [weak self] value in
               guard let self = self else { return }
@@ -90,7 +92,10 @@ final class ReachabilityControllerImpl: ReachabilityController, BKAvailabilityOb
 
         self.startCentral()
       }
-    }.eraseToAnyPublisher()
+    }
+    .timeout(.seconds(3), scheduler: DispatchQueue.main, customError: nil)
+    .replaceEmpty(with: .unavailable)
+    .eraseToAnyPublisher()
   }
 
   public func openBleSettings() {

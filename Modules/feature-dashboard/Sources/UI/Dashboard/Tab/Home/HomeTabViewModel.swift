@@ -114,10 +114,8 @@ final class HomeTabViewModel<Router: RouterHost>: ViewModel<Router, HomeTabState
             )
           )
         )
-      case .noPermission, .disabled:
+      case .noPermission, .disabled, .unavailable:
         self.toggleBleModal()
-      default:
-        break
       }
     }
   }
