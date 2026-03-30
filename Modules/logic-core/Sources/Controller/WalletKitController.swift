@@ -226,7 +226,7 @@ final actor WalletKitControllerImpl: WalletKitController {
 
   func fetchIssuedDocuments(excluded: [DocumentTypeIdentifier]) -> [any DocClaimsDecodable] {
     let excludedRawValues = excluded.map { $0.rawValue }
-    return fetchIssuedDocuments().filter { !excludedRawValues.contains($0.docType.orEmpty) }
+    return fetchIssuedDocuments().filter { !excludedRawValues.contains($0.docType) }
   }
 
   func fetchDocument(with id: String) -> (any DocClaimsDecodable)? {

@@ -17,6 +17,7 @@ import Foundation
 import Combine
 import Network
 import BluetoothKit
+import CoreBluetooth
 import UIKit
 
 public protocol ReachabilityController: Sendable {
@@ -72,6 +73,17 @@ final class ReachabilityControllerImpl: ReachabilityController, BKAvailabilityOb
   }
 
   public func getBleAvailibity() -> AnyPublisher<Reachability.BleAvailibity, Never> {
+    let authorization = CBManager.authorization
+    switch authorization {
+    case .denied, .restricted:
+      return Just(.noPermission).eraseToAnyPublisher()
+    default:
+      break
+    }
+    // For .notDetermined: starts BKCentral which triggers the system permission dialog,
+    // then waits for the user's response before returning the actual state.
+    // For .allowedAlways: checks the actual BLE power state.
+    let timeout: TimeInterval = authorization == .notDetermined ? 60 : 3
     return Deferred {
       Future { [weak self] promise in
 
@@ -93,7 +105,7 @@ final class ReachabilityControllerImpl: ReachabilityController, BKAvailabilityOb
         self.startCentral()
       }
     }
-    .timeout(.seconds(3), scheduler: DispatchQueue.main, customError: nil)
+    .timeout(.seconds(timeout), scheduler: DispatchQueue.main, customError: nil)
     .replaceEmpty(with: .unavailable)
     .eraseToAnyPublisher()
   }
