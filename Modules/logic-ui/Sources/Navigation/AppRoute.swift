@@ -18,7 +18,7 @@ import logic_business
 import logic_core
 import logic_resources
 
-public struct IntroUiConfig: UIConfigType, Equatable {
+public final class IntroUiConfig: UIConfigType, Equatable, @unchecked Sendable {
   public let showDismissOption: Bool
   public let nextRoute: AppRoute?
 
