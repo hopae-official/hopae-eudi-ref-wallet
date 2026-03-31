@@ -2570,6 +2570,160 @@
         }
       }
     },
+    "about_this_app" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About This App"
+          }
+        }
+      }
+    },
+    "intro_what_is_this_app" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What is this app?"
+          }
+        }
+      }
+    },
+    "intro_what_is_this_app_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This app is a clone of the official EU Digital Identity Wallet Reference Implementation. It is maintained by Hopae and kept in sync with the latest official release."
+          }
+        }
+      }
+    },
+    "intro_current_version" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current version: v%@"
+          }
+        }
+      }
+    },
+    "intro_minimal_modifications" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Minimal modifications"
+          }
+        }
+      }
+    },
+    "intro_minimal_modifications_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Minor adjustments have been made solely to meet app store review requirements, including permission descriptions and error handling. Beyond these, the app is identical to the official EUDI Reference Wallet."
+          }
+        }
+      }
+    },
+    "intro_privacy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacy"
+          }
+        }
+      }
+    },
+    "intro_privacy_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No personal information is collected or transmitted to Hopae. All data remains on your device. This app does not include any analytics or tracking."
+          }
+        }
+      }
+    },
+    "intro_open_source" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Source"
+          }
+        }
+      }
+    },
+    "intro_open_source_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This project is open source. For more information, source code, and issue reporting, visit our GitHub repository."
+          }
+        }
+      }
+    },
+    "intro_disclaimer" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disclaimer"
+          }
+        }
+      }
+    },
+    "intro_disclaimer_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This app is provided \"as is\" for testing and demonstration purposes only. It is not intended for production use. Hopae assumes no liability for any use of this application."
+          }
+        }
+      }
+    },
+    "intro_dont_show_again" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Don't show again until next update"
+          }
+        }
+      }
+    },
+    "intro_continue" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue"
+          }
+        }
+      }
+    },
     "yes" : {
       "extractionState" : "manual"
     }
