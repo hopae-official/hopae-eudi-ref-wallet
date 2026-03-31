@@ -11031,49 +11031,236 @@ public class MockRouterHost: RouterHost, Cuckoo.ProtocolMock, @unchecked Sendabl
 public class RouterHostStub:RouterHost, @unchecked Sendable {
 
 
-    
+
     public func push(with p0: AppRoute) {
         return DefaultValueRegistry.defaultValue(for: (Void).self)
     }
-    
+
     public func pop() {
         return DefaultValueRegistry.defaultValue(for: (Void).self)
     }
-    
+
     public func popTo(with p0: AppRoute, inclusive p1: Bool) {
         return DefaultValueRegistry.defaultValue(for: (Void).self)
     }
-    
+
     public func popTo(with p0: AppRoute) {
         return DefaultValueRegistry.defaultValue(for: (Void).self)
     }
-    
+
     public func composeApplication() -> AnyView {
         return DefaultValueRegistry.defaultValue(for: (AnyView).self)
     }
-    
+
     public func getCurrentScreen() -> AppRoute? {
         return DefaultValueRegistry.defaultValue(for: (AppRoute?).self)
     }
-    
+
     public func getToolbarConfig() -> UIConfig.ToolBar {
         return DefaultValueRegistry.defaultValue(for: (UIConfig.ToolBar).self)
     }
-    
+
     public func userIsLoggedInWithDocuments() -> Bool {
         return DefaultValueRegistry.defaultValue(for: (Bool).self)
     }
-    
+
     public func userIsLoggedInWithNoDocuments() -> Bool {
         return DefaultValueRegistry.defaultValue(for: (Bool).self)
     }
-    
+
     public func isScreenForeground(with p0: AppRoute) -> Bool {
         return DefaultValueRegistry.defaultValue(for: (Bool).self)
     }
-    
+
     public func isScreenOnBackStack(with p0: AppRoute) -> Bool {
         return DefaultValueRegistry.defaultValue(for: (Bool).self)
+    }
+}
+
+
+
+// MARK: - Mocks generated from file: '../Modules/feature-startup/Sources/Interactor/IntroInteractor.swift'
+
+import Cuckoo
+import Foundation
+import logic_business
+@testable import feature_startup
+
+public class MockIntroInteractor: IntroInteractor, Cuckoo.ProtocolMock, @unchecked Sendable {
+    public typealias MocksType = IntroInteractor
+    public typealias Stubbing = __StubbingProxy_IntroInteractor
+    public typealias Verification = __VerificationProxy_IntroInteractor
+
+    // Original typealiases
+
+    public let cuckoo_manager = Cuckoo.MockManager.preconfiguredManager ?? Cuckoo.MockManager(hasParent: false)
+
+    private var __defaultImplStub: (any IntroInteractor)?
+
+    public func enableDefaultImplementation(_ stub: any IntroInteractor) {
+        __defaultImplStub = stub
+        cuckoo_manager.enableDefaultStubImplementation()
+    }
+
+
+    public func shouldShowIntro() async -> Bool {
+        return await cuckoo_manager.call(
+            "shouldShowIntro() async -> Bool",
+            parameters: (),
+            escapingParameters: (),
+            superclassCall: Cuckoo.MockManager.crashOnProtocolSuperclassCall(),
+            defaultCall: await __defaultImplStub!.shouldShowIntro()
+        )
+    }
+
+    public func dismissIntro() async {
+        return await cuckoo_manager.call(
+            "dismissIntro() async",
+            parameters: (),
+            escapingParameters: (),
+            superclassCall: Cuckoo.MockManager.crashOnProtocolSuperclassCall(),
+            defaultCall: await __defaultImplStub!.dismissIntro()
+        )
+    }
+
+    public func getAppVersion() async -> String {
+        return await cuckoo_manager.call(
+            "getAppVersion() async -> String",
+            parameters: (),
+            escapingParameters: (),
+            superclassCall: Cuckoo.MockManager.crashOnProtocolSuperclassCall(),
+            defaultCall: await __defaultImplStub!.getAppVersion()
+        )
+    }
+
+    public func getGitHubUrl() async -> URL? {
+        return await cuckoo_manager.call(
+            "getGitHubUrl() async -> URL?",
+            parameters: (),
+            escapingParameters: (),
+            superclassCall: Cuckoo.MockManager.crashOnProtocolSuperclassCall(),
+            defaultCall: await __defaultImplStub!.getGitHubUrl()
+        )
+    }
+
+    public struct __StubbingProxy_IntroInteractor: Cuckoo.StubbingProxy {
+        private let cuckoo_manager: Cuckoo.MockManager
+
+        public init(manager: Cuckoo.MockManager) {
+            self.cuckoo_manager = manager
+        }
+
+        func shouldShowIntro() -> Cuckoo.ProtocolStubFunction<(), Bool> {
+            let matchers: [Cuckoo.ParameterMatcher<Void>] = []
+            return .init(stub: cuckoo_manager.createStub(for: MockIntroInteractor.self,
+                method: "shouldShowIntro() async -> Bool",
+                parameterMatchers: matchers
+            ))
+        }
+
+        func dismissIntro() -> Cuckoo.ProtocolStubNoReturnFunction<()> {
+            let matchers: [Cuckoo.ParameterMatcher<Void>] = []
+            return .init(stub: cuckoo_manager.createStub(for: MockIntroInteractor.self,
+                method: "dismissIntro() async",
+                parameterMatchers: matchers
+            ))
+        }
+
+        func getAppVersion() -> Cuckoo.ProtocolStubFunction<(), String> {
+            let matchers: [Cuckoo.ParameterMatcher<Void>] = []
+            return .init(stub: cuckoo_manager.createStub(for: MockIntroInteractor.self,
+                method: "getAppVersion() async -> String",
+                parameterMatchers: matchers
+            ))
+        }
+
+        func getGitHubUrl() -> Cuckoo.ProtocolStubFunction<(), URL?> {
+            let matchers: [Cuckoo.ParameterMatcher<Void>] = []
+            return .init(stub: cuckoo_manager.createStub(for: MockIntroInteractor.self,
+                method: "getGitHubUrl() async -> URL?",
+                parameterMatchers: matchers
+            ))
+        }
+    }
+
+    public struct __VerificationProxy_IntroInteractor: Cuckoo.VerificationProxy {
+        private let cuckoo_manager: Cuckoo.MockManager
+        private let callMatcher: Cuckoo.CallMatcher
+        private let sourceLocation: Cuckoo.SourceLocation
+
+        public init(manager: Cuckoo.MockManager, callMatcher: Cuckoo.CallMatcher, sourceLocation: Cuckoo.SourceLocation) {
+            self.cuckoo_manager = manager
+            self.callMatcher = callMatcher
+            self.sourceLocation = sourceLocation
+        }
+
+
+        @discardableResult
+        func shouldShowIntro() -> Cuckoo.__DoNotUse<(), Bool> {
+            let matchers: [Cuckoo.ParameterMatcher<Void>] = []
+            return cuckoo_manager.verify(
+                "shouldShowIntro() async -> Bool",
+                callMatcher: callMatcher,
+                parameterMatchers: matchers,
+                sourceLocation: sourceLocation
+            )
+        }
+
+
+        @discardableResult
+        func dismissIntro() -> Cuckoo.__DoNotUse<(), Void> {
+            let matchers: [Cuckoo.ParameterMatcher<Void>] = []
+            return cuckoo_manager.verify(
+                "dismissIntro() async",
+                callMatcher: callMatcher,
+                parameterMatchers: matchers,
+                sourceLocation: sourceLocation
+            )
+        }
+
+
+        @discardableResult
+        func getAppVersion() -> Cuckoo.__DoNotUse<(), String> {
+            let matchers: [Cuckoo.ParameterMatcher<Void>] = []
+            return cuckoo_manager.verify(
+                "getAppVersion() async -> String",
+                callMatcher: callMatcher,
+                parameterMatchers: matchers,
+                sourceLocation: sourceLocation
+            )
+        }
+
+
+        @discardableResult
+        func getGitHubUrl() -> Cuckoo.__DoNotUse<(), URL?> {
+            let matchers: [Cuckoo.ParameterMatcher<Void>] = []
+            return cuckoo_manager.verify(
+                "getGitHubUrl() async -> URL?",
+                callMatcher: callMatcher,
+                parameterMatchers: matchers,
+                sourceLocation: sourceLocation
+            )
+        }
+    }
+}
+
+public class IntroInteractorStub: IntroInteractor, @unchecked Sendable {
+
+
+    public func shouldShowIntro() async -> Bool {
+        return DefaultValueRegistry.defaultValue(for: (Bool).self)
+    }
+
+    public func dismissIntro() async {
+        return DefaultValueRegistry.defaultValue(for: (Void).self)
+    }
+
+    public func getAppVersion() async -> String {
+        return DefaultValueRegistry.defaultValue(for: (String).self)
+    }
+
+    public func getGitHubUrl() async -> URL? {
+        return DefaultValueRegistry.defaultValue(for: (URL?).self)
     }
 }
 
