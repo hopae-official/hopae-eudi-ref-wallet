@@ -32,16 +32,22 @@ struct IntroView<Router: RouterHost>: View {
       navigationTitle: viewModel.viewState.showDismissOption ? nil : .aboutThisApp,
       toolbarContent: viewModel.toolbarContent()
     ) {
-      ScrollView {
-        content(
-          viewState: viewModel.viewState,
-          onToggle: { viewModel.toggleDontShowAgain() },
-          onContinue: { Task { await viewModel.onContinue() } }
-        )
-        .padding(.horizontal, Theme.shared.dimension.padding)
-        .padding(.top, Theme.shared.dimension.padding)
+      VStack(spacing: .zero) {
+        ScrollView {
+          scrollContent(viewState: viewModel.viewState)
+            .padding(.horizontal, Theme.shared.dimension.padding)
+            .padding(.top, Theme.shared.dimension.padding)
+        }
+        .scrollIndicators(.hidden)
+
+        if viewModel.viewState.showDismissOption {
+          dismissFooter(
+            isChecked: viewModel.viewState.dontShowAgainChecked,
+            onToggle: { viewModel.toggleDontShowAgain() },
+            onContinue: { Task { await viewModel.onContinue() } }
+          )
+        }
       }
-      .scrollIndicators(.hidden)
     }
     .task {
       await viewModel.initialize()
@@ -51,10 +57,8 @@ struct IntroView<Router: RouterHost>: View {
 
 @MainActor
 @ViewBuilder
-private func content(
-  viewState: IntroViewState,
-  onToggle: @escaping () -> Void,
-  onContinue: @escaping () -> Void
+private func scrollContent(
+  viewState: IntroViewState
 ) -> some View {
   VStack(spacing: SPACING_LARGE_MEDIUM) {
 
@@ -102,17 +106,6 @@ private func content(
       title: .introDisclaimer,
       body: .introDisclaimerBody
     )
-
-    if viewState.showDismissOption {
-      Divider()
-        .padding(.top, SPACING_SMALL)
-
-      dismissSection(
-        isChecked: viewState.dontShowAgainChecked,
-        onToggle: onToggle,
-        onContinue: onContinue
-      )
-    }
   }
   .padding(.bottom, SPACING_LARGE)
 }
@@ -137,11 +130,6 @@ private func headerSection(
         .foregroundColor(Theme.shared.color.onSurface)
         .lineLimit(1)
         .minimumScaleFactor(0.75)
-
-      Text(verbatim: "EU Digital Identity Wallet")
-        .typography(Theme.shared.font.bodySmall)
-        .foregroundColor(Theme.shared.color.onSurfaceVariant)
-        .lineLimit(1)
 
       Text(verbatim: "v\(appVersion)")
         .typography(Theme.shared.font.labelSmall)
@@ -207,36 +195,44 @@ private func gitHubLinkButton(url: URL) -> some View {
 
 @MainActor
 @ViewBuilder
-private func dismissSection(
+private func dismissFooter(
   isChecked: Bool,
   onToggle: @escaping () -> Void,
   onContinue: @escaping () -> Void
 ) -> some View {
-  VStack(spacing: SPACING_MEDIUM) {
-    Button(action: onToggle) {
-      HStack(spacing: SPACING_SMALL) {
-        Image(systemName: isChecked ? "checkmark.square.fill" : "square")
-          .foregroundColor(
-            isChecked
-            ? Theme.shared.color.primary
-            : Theme.shared.color.onSurfaceVariant
-          )
-        Text(.introDontShowAgain)
-          .typography(Theme.shared.font.bodyMedium)
-          .foregroundColor(Theme.shared.color.onSurface)
-          .fixedSize(horizontal: false, vertical: true)
-        Spacer()
+  VStack(spacing: .zero) {
+    Divider()
+
+    VStack(spacing: SPACING_LARGE_MEDIUM) {
+      Button(action: onToggle) {
+        HStack(spacing: SPACING_SMALL) {
+          Image(systemName: isChecked ? "checkmark.square.fill" : "square")
+            .foregroundColor(
+              isChecked
+              ? Theme.shared.color.primary
+              : Theme.shared.color.onSurfaceVariant
+            )
+          Text(.introDontShowAgain)
+            .typography(Theme.shared.font.bodyMedium)
+            .foregroundColor(Theme.shared.color.onSurface)
+            .fixedSize(horizontal: false, vertical: true)
+          Spacer()
+        }
+      }
+
+      Button(action: onContinue) {
+        Text(.introContinue)
+          .typography(Theme.shared.font.labelLarge)
+          .foregroundColor(Theme.shared.color.onPrimary)
+          .frame(maxWidth: .infinity)
+          .padding(.vertical, SPACING_MEDIUM)
+          .background(Theme.shared.color.primary)
+          .cornerRadius(Theme.shared.shape.small)
       }
     }
-
-    Button(action: onContinue) {
-      Text(.introContinue)
-        .typography(Theme.shared.font.labelLarge)
-        .foregroundColor(Theme.shared.color.onPrimary)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, SPACING_MEDIUM_SMALL)
-        .background(Theme.shared.color.primary)
-        .cornerRadius(Theme.shared.shape.small)
-    }
+    .padding(.horizontal, Theme.shared.dimension.padding)
+    .padding(.top, SPACING_MEDIUM)
+    .padding(.bottom, SPACING_LARGE_MEDIUM)
   }
+  .background(Theme.shared.color.background)
 }
