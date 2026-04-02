@@ -135,8 +135,8 @@ private func headerSection(
         .typography(Theme.shared.font.titleMedium)
         .bold()
         .foregroundColor(Theme.shared.color.onSurface)
-        .lineLimit(2)
-        .minimumScaleFactor(0.8)
+        .lineLimit(1)
+        .minimumScaleFactor(0.75)
 
       Text(verbatim: "EU Digital Identity Wallet")
         .typography(Theme.shared.font.bodySmall)
