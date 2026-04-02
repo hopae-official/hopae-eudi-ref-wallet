@@ -32,7 +32,7 @@ final class WalletProviderAttestationConfigImpl: WalletProviderAttestationConfig
 
   var walletProviderAttestationUrl: String {
     switch configLogic.appBuildVariant {
-    case .DEMO:
+    case .DEMO, .EDGE:
       "https://wallet-provider.eudiw.dev"
     case .DEV:
       "https://dev.wallet-provider.eudiw.dev"
