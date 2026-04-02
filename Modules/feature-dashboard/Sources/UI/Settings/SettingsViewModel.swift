@@ -93,11 +93,26 @@ final class SettingsViewModel<Router: RouterHost>: ViewModel<Router, SettingsVie
       items.append(
         .init(
           title: .sourceRepository,
-          showDivider: false,
           action: sourceRepoUrl.open()
         )
       )
     }
+
+    items.append(
+      .init(
+        title: .aboutThisApp,
+        showDivider: false,
+        action: self.router.push(
+          with: .featureStartupModule(
+            .intro(
+              config: IntroUiConfig(
+                showDismissOption: false
+              )
+            )
+          )
+        )
+      )
+    )
 
     setState {
       $0.copy(

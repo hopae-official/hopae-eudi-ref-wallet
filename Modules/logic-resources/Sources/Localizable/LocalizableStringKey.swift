@@ -237,6 +237,20 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case transactionDetailsReportTransactionMessage
   case transactionDetailsReportTransactionButton
   case settings
+  case aboutThisApp
+  case introWhatIsThisApp
+  case introWhatIsThisAppBody
+  case introCurrentVersion([String])
+  case introMinimalModifications
+  case introMinimalModificationsBody
+  case introPrivacy
+  case introPrivacyBody
+  case introOpenSource
+  case introOpenSourceBody
+  case introDisclaimer
+  case introDisclaimerBody
+  case introDontShowAgain
+  case introContinue
   case documentDetailsDocumentCredentialsText([String])
   case documentDetailsDocumentCredentialsExpandedTextSubtitle
   case documentsListCredentialsUsageText([String])
