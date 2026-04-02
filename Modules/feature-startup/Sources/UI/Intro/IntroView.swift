@@ -71,14 +71,14 @@ private func scrollContent(
 
     sectionView(
       title: .introWhatIsThisApp,
-      body: .introWhatIsThisAppBody
+      body: viewState.isEdge ? .introEdgeWhatIsThisAppBody : .introWhatIsThisAppBody
     )
 
     Divider()
 
     sectionView(
-      title: .introMinimalModifications,
-      body: .introMinimalModificationsBody
+      title: viewState.isEdge ? .introEdgeEarlySpecSupport : .introMinimalModifications,
+      body: viewState.isEdge ? .introEdgeEarlySpecSupportBody : .introMinimalModificationsBody
     )
 
     Divider()

@@ -21,6 +21,7 @@ public protocol IntroInteractor: Sendable {
   func dismissIntro() async
   func getAppVersion() async -> String
   func getGitHubUrl() async -> URL?
+  func isEdgeVariant() async -> Bool
 }
 
 final actor IntroInteractorImpl: IntroInteractor {
@@ -51,5 +52,9 @@ final actor IntroInteractorImpl: IntroInteractor {
 
   public func getGitHubUrl() -> URL? {
     URL(string: "https://github.com/hopae-official/hopae-eudi-ref-wallet")
+  }
+
+  public func isEdgeVariant() -> Bool {
+    configLogic.appBuildVariant == .EDGE
   }
 }

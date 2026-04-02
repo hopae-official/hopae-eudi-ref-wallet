@@ -11143,6 +11143,16 @@ public class MockIntroInteractor: IntroInteractor, Cuckoo.ProtocolMock, @uncheck
         )
     }
 
+    public func isEdgeVariant() async -> Bool {
+        return await cuckoo_manager.call(
+            "isEdgeVariant() async -> Bool",
+            parameters: (),
+            escapingParameters: (),
+            superclassCall: Cuckoo.MockManager.crashOnProtocolSuperclassCall(),
+            defaultCall: await __defaultImplStub!.isEdgeVariant()
+        )
+    }
+
     public struct __StubbingProxy_IntroInteractor: Cuckoo.StubbingProxy {
         private let cuckoo_manager: Cuckoo.MockManager
 
@@ -11178,6 +11188,14 @@ public class MockIntroInteractor: IntroInteractor, Cuckoo.ProtocolMock, @uncheck
             let matchers: [Cuckoo.ParameterMatcher<Void>] = []
             return .init(stub: cuckoo_manager.createStub(for: MockIntroInteractor.self,
                 method: "getGitHubUrl() async -> URL?",
+                parameterMatchers: matchers
+            ))
+        }
+
+        func isEdgeVariant() -> Cuckoo.ProtocolStubFunction<(), Bool> {
+            let matchers: [Cuckoo.ParameterMatcher<Void>] = []
+            return .init(stub: cuckoo_manager.createStub(for: MockIntroInteractor.self,
+                method: "isEdgeVariant() async -> Bool",
                 parameterMatchers: matchers
             ))
         }
@@ -11241,6 +11259,17 @@ public class MockIntroInteractor: IntroInteractor, Cuckoo.ProtocolMock, @uncheck
                 sourceLocation: sourceLocation
             )
         }
+
+        @discardableResult
+        func isEdgeVariant() -> Cuckoo.__DoNotUse<(), Bool> {
+            let matchers: [Cuckoo.ParameterMatcher<Void>] = []
+            return cuckoo_manager.verify(
+                "isEdgeVariant() async -> Bool",
+                callMatcher: callMatcher,
+                parameterMatchers: matchers,
+                sourceLocation: sourceLocation
+            )
+        }
     }
 }
 
@@ -11261,6 +11290,10 @@ public class IntroInteractorStub: IntroInteractor, @unchecked Sendable {
 
     public func getGitHubUrl() async -> URL? {
         return DefaultValueRegistry.defaultValue(for: (URL?).self)
+    }
+
+    public func isEdgeVariant() async -> Bool {
+        return DefaultValueRegistry.defaultValue(for: (Bool).self)
     }
 }
 

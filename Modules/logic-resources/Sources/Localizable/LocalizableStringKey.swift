@@ -251,6 +251,9 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case introDisclaimerBody
   case introDontShowAgain
   case introContinue
+  case introEdgeWhatIsThisAppBody
+  case introEdgeEarlySpecSupport
+  case introEdgeEarlySpecSupportBody
   case documentDetailsDocumentCredentialsText([String])
   case documentDetailsDocumentCredentialsExpandedTextSubtitle
   case documentsListCredentialsUsageText([String])

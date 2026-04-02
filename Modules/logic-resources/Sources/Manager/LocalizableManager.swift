@@ -536,6 +536,12 @@ final class LocalizableManager: LocalizableManagerType {
       bundle.localizedString(forKey: "intro_dont_show_again")
     case .introContinue:
       bundle.localizedString(forKey: "intro_continue")
+    case .introEdgeWhatIsThisAppBody:
+      bundle.localizedString(forKey: "intro_edge_what_is_this_app_body")
+    case .introEdgeEarlySpecSupport:
+      bundle.localizedString(forKey: "intro_edge_early_spec_support")
+    case .introEdgeEarlySpecSupportBody:
+      bundle.localizedString(forKey: "intro_edge_early_spec_support_body")
     }
   }
 }

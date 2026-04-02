@@ -95,7 +95,7 @@ struct WalletKitConfigImpl: WalletKitConfig {
 
     let openId4VciConfigurations: [VciConfig] = {
       switch configLogic.appBuildVariant {
-      case .DEMO:
+      case .DEMO, .EDGE:
         return [
           .init(
             config: .init(
@@ -252,7 +252,7 @@ struct WalletKitConfigImpl: WalletKitConfig {
 
   var documentIssuanceConfig: DocumentIssuanceConfig {
     return switch configLogic.appBuildVariant {
-    case .DEMO:
+    case .DEMO, .EDGE:
       DocumentIssuanceConfig(
         defaultRule: DocumentIssuanceRule(
           policy: .rotateUse,

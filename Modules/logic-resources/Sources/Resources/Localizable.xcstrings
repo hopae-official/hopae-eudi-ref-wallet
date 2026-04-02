@@ -2713,6 +2713,39 @@
         }
       }
     },
+    "intro_edge_what_is_this_app_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This app is an enhanced version of the EU Digital Identity Wallet, maintained by Hopae. It includes early implementations of emerging specifications such as DCQL that are not yet available in the official reference wallet."
+          }
+        }
+      }
+    },
+    "intro_edge_early_spec_support" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Early specification support"
+          }
+        }
+      }
+    },
+    "intro_edge_early_spec_support_body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This build incorporates specifications that are currently at PR or draft level in the official standards process. Features may change as specifications evolve. This allows you to preview and test the latest digital identity capabilities ahead of official adoption."
+          }
+        }
+      }
+    },
     "intro_continue" : {
       "extractionState" : "manual",
       "localizations" : {

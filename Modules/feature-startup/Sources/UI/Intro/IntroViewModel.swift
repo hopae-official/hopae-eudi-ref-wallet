@@ -24,6 +24,7 @@ struct IntroViewState: ViewState {
   let gitHubUrl: URL?
   let showDismissOption: Bool
   let dontShowAgainChecked: Bool
+  let isEdge: Bool
 }
 
 final class IntroViewModel<Router: RouterHost>: ViewModel<Router, IntroViewState> {
@@ -45,7 +46,8 @@ final class IntroViewModel<Router: RouterHost>: ViewModel<Router, IntroViewState
         appVersion: "",
         gitHubUrl: nil,
         showDismissOption: config.showDismissOption,
-        dontShowAgainChecked: false
+        dontShowAgainChecked: false,
+        isEdge: false
       )
     )
   }
@@ -54,11 +56,13 @@ final class IntroViewModel<Router: RouterHost>: ViewModel<Router, IntroViewState
     let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "EUDI Wallet"
     let appVersion = await interactor.getAppVersion()
     let gitHubUrl = await interactor.getGitHubUrl()
+    let isEdge = await interactor.isEdgeVariant()
     setState {
       $0.copy(
         appName: appName,
         appVersion: appVersion,
-        gitHubUrl: gitHubUrl
+        gitHubUrl: gitHubUrl,
+        isEdge: isEdge
       )
     }
   }

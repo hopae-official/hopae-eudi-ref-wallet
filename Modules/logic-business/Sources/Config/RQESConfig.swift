@@ -40,7 +40,7 @@ final class RQESConfig: EudiRQESUiConfig {
           includeRevocationInfo: false
         )
       ]
-    case .DEMO:
+    case .DEMO, .EDGE:
       [
         .init(
           name: "Wallet-Centric",
