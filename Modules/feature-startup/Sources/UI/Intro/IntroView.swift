@@ -35,7 +35,6 @@ struct IntroView<Router: RouterHost>: View {
       ScrollView {
         content(
           viewState: viewModel.viewState,
-          screenWidth: getScreenRect().width,
           onToggle: { viewModel.toggleDontShowAgain() },
           onContinue: { Task { await viewModel.onContinue() } }
         )
@@ -54,7 +53,6 @@ struct IntroView<Router: RouterHost>: View {
 @ViewBuilder
 private func content(
   viewState: IntroViewState,
-  screenWidth: CGFloat,
   onToggle: @escaping () -> Void,
   onContinue: @escaping () -> Void
 ) -> some View {
@@ -62,8 +60,8 @@ private func content(
 
     if viewState.showDismissOption {
       headerSection(
-        screenWidth: screenWidth,
-        appName: viewState.appName
+        appName: viewState.appName,
+        appVersion: viewState.appVersion
       )
     }
 
@@ -71,13 +69,6 @@ private func content(
       title: .introWhatIsThisApp,
       body: .introWhatIsThisAppBody
     )
-
-    Text(.introCurrentVersion([viewState.appVersion]))
-      .typography(Theme.shared.font.bodySmall)
-      .foregroundColor(Theme.shared.color.onSurfaceVariant)
-      .fixedSize(horizontal: false, vertical: true)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, -SPACING_MEDIUM)
 
     Divider()
 
@@ -129,34 +120,40 @@ private func content(
 @MainActor
 @ViewBuilder
 private func headerSection(
-  screenWidth: CGFloat,
-  appName: String
+  appName: String,
+  appVersion: String
 ) -> some View {
-  VStack(spacing: SPACING_MEDIUM) {
-    HStack(spacing: SPACING_MEDIUM) {
-      Theme.shared.image.logo
-        .resizable()
-        .aspectRatio(contentMode: .fit)
-        .frame(width: screenWidth / 6, height: screenWidth / 6)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.shared.shape.small))
+  HStack(spacing: SPACING_MEDIUM) {
+    Theme.shared.image.logo
+      .resizable()
+      .aspectRatio(contentMode: .fit)
+      .frame(width: 56, height: 56)
+      .clipShape(RoundedRectangle(cornerRadius: 12))
 
-      VStack(alignment: .leading, spacing: SPACING_EXTRA_SMALL) {
-        Text(verbatim: appName)
-          .typography(Theme.shared.font.titleLarge)
-          .bold()
-          .foregroundColor(Theme.shared.color.onSurface)
-          .fixedSize(horizontal: false, vertical: true)
+    VStack(alignment: .leading, spacing: SPACING_EXTRA_SMALL) {
+      Text(verbatim: appName)
+        .typography(Theme.shared.font.titleMedium)
+        .bold()
+        .foregroundColor(Theme.shared.color.onSurface)
+        .lineLimit(2)
+        .minimumScaleFactor(0.8)
 
-        Text(.aboutThisApp)
-          .typography(Theme.shared.font.bodyMedium)
-          .foregroundColor(Theme.shared.color.onSurfaceVariant)
-          .fixedSize(horizontal: false, vertical: true)
-      }
+      Text(verbatim: "EU Digital Identity Wallet")
+        .typography(Theme.shared.font.bodySmall)
+        .foregroundColor(Theme.shared.color.onSurfaceVariant)
+        .lineLimit(1)
 
-      Spacer()
+      Text(verbatim: "v\(appVersion)")
+        .typography(Theme.shared.font.labelSmall)
+        .foregroundColor(Theme.shared.color.onSurfaceVariant)
+        .padding(.horizontal, SPACING_SMALL)
+        .padding(.vertical, 2)
+        .background(Theme.shared.color.surfaceVariant.opacity(0.5))
+        .cornerRadius(SPACING_EXTRA_SMALL)
     }
+
+    Spacer(minLength: 0)
   }
-  .frame(maxWidth: .infinity)
   .padding(.bottom, SPACING_SMALL)
 }
 
