@@ -19,6 +19,7 @@ import logic_resources
 
 @Copyable
 struct IntroViewState: ViewState {
+  let appName: String
   let appVersion: String
   let gitHubUrl: URL?
   let showDismissOption: Bool
@@ -40,6 +41,7 @@ final class IntroViewModel<Router: RouterHost>: ViewModel<Router, IntroViewState
     super.init(
       router: router,
       initialState: .init(
+        appName: "",
         appVersion: "",
         gitHubUrl: nil,
         showDismissOption: config.showDismissOption,
@@ -49,10 +51,12 @@ final class IntroViewModel<Router: RouterHost>: ViewModel<Router, IntroViewState
   }
 
   func initialize() async {
+    let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "EUDI Wallet"
     let appVersion = await interactor.getAppVersion()
     let gitHubUrl = await interactor.getGitHubUrl()
     setState {
       $0.copy(
+        appName: appName,
         appVersion: appVersion,
         gitHubUrl: gitHubUrl
       )

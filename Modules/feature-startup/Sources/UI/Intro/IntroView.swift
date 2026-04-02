@@ -27,16 +27,22 @@ struct IntroView<Router: RouterHost>: View {
 
   var body: some View {
     ContentScreenView(
-      canScroll: true,
+      padding: .zero,
+      canScroll: false,
       navigationTitle: viewModel.viewState.showDismissOption ? nil : .aboutThisApp,
       toolbarContent: viewModel.toolbarContent()
     ) {
-      content(
-        viewState: viewModel.viewState,
-        screenWidth: getScreenRect().width,
-        onToggle: { viewModel.toggleDontShowAgain() },
-        onContinue: { Task { await viewModel.onContinue() } }
-      )
+      ScrollView {
+        content(
+          viewState: viewModel.viewState,
+          screenWidth: getScreenRect().width,
+          onToggle: { viewModel.toggleDontShowAgain() },
+          onContinue: { Task { await viewModel.onContinue() } }
+        )
+        .padding(.horizontal, Theme.shared.dimension.padding)
+        .padding(.top, Theme.shared.dimension.padding)
+      }
+      .scrollIndicators(.hidden)
     }
     .task {
       await viewModel.initialize()
@@ -52,10 +58,13 @@ private func content(
   onToggle: @escaping () -> Void,
   onContinue: @escaping () -> Void
 ) -> some View {
-  VStack(spacing: SPACING_MEDIUM) {
+  VStack(spacing: SPACING_LARGE_MEDIUM) {
 
     if viewState.showDismissOption {
-      headerSection(screenWidth: screenWidth)
+      headerSection(
+        screenWidth: screenWidth,
+        appName: viewState.appName
+      )
     }
 
     sectionView(
@@ -64,19 +73,27 @@ private func content(
     )
 
     Text(.introCurrentVersion([viewState.appVersion]))
-      .typography(Theme.shared.font.bodyMedium)
+      .typography(Theme.shared.font.bodySmall)
       .foregroundColor(Theme.shared.color.onSurfaceVariant)
+      .fixedSize(horizontal: false, vertical: true)
       .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.top, -SPACING_MEDIUM)
+
+    Divider()
 
     sectionView(
       title: .introMinimalModifications,
       body: .introMinimalModificationsBody
     )
 
+    Divider()
+
     sectionView(
       title: .introPrivacy,
       body: .introPrivacyBody
     )
+
+    Divider()
 
     sectionView(
       title: .introOpenSource,
@@ -84,17 +101,11 @@ private func content(
     )
 
     if let gitHubUrl = viewState.gitHubUrl {
-      Button {
-        gitHubUrl.open()
-      } label: {
-        HStack {
-          Text(.sourceRepository)
-            .typography(Theme.shared.font.bodyMedium)
-            .foregroundColor(Theme.shared.color.primary)
-          Spacer()
-        }
-      }
+      gitHubLinkButton(url: gitHubUrl)
+        .padding(.top, -SPACING_MEDIUM_SMALL)
     }
+
+    Divider()
 
     sectionView(
       title: .introDisclaimer,
@@ -102,6 +113,9 @@ private func content(
     )
 
     if viewState.showDismissOption {
+      Divider()
+        .padding(.top, SPACING_SMALL)
+
       dismissSection(
         isChecked: viewState.dontShowAgainChecked,
         onToggle: onToggle,
@@ -109,24 +123,41 @@ private func content(
       )
     }
   }
-  .padding(.bottom, SPACING_LARGE_MEDIUM)
+  .padding(.bottom, SPACING_LARGE)
 }
 
 @MainActor
 @ViewBuilder
-private func headerSection(screenWidth: CGFloat) -> some View {
-  VStack(spacing: SPACING_MEDIUM_SMALL) {
-    Theme.shared.image.logo
-      .resizable()
-      .aspectRatio(contentMode: .fit)
-      .frame(width: screenWidth / 5)
+private func headerSection(
+  screenWidth: CGFloat,
+  appName: String
+) -> some View {
+  VStack(spacing: SPACING_MEDIUM) {
+    HStack(spacing: SPACING_MEDIUM) {
+      Theme.shared.image.logo
+        .resizable()
+        .aspectRatio(contentMode: .fit)
+        .frame(width: screenWidth / 6, height: screenWidth / 6)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.shared.shape.small))
 
-    Text(.aboutThisApp)
-      .typography(Theme.shared.font.headlineMedium)
-      .foregroundColor(Theme.shared.color.onSurface)
+      VStack(alignment: .leading, spacing: SPACING_EXTRA_SMALL) {
+        Text(verbatim: appName)
+          .typography(Theme.shared.font.titleLarge)
+          .bold()
+          .foregroundColor(Theme.shared.color.onSurface)
+          .fixedSize(horizontal: false, vertical: true)
+
+        Text(.aboutThisApp)
+          .typography(Theme.shared.font.bodyMedium)
+          .foregroundColor(Theme.shared.color.onSurfaceVariant)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+
+      Spacer()
+    }
   }
   .frame(maxWidth: .infinity)
-  .padding(.bottom, SPACING_MEDIUM)
+  .padding(.bottom, SPACING_SMALL)
 }
 
 @MainActor
@@ -138,13 +169,43 @@ private func sectionView(
   VStack(alignment: .leading, spacing: SPACING_SMALL) {
     Text(title)
       .typography(Theme.shared.font.titleSmall)
+      .bold()
       .foregroundColor(Theme.shared.color.onSurface)
+      .fixedSize(horizontal: false, vertical: true)
 
     Text(body)
       .typography(Theme.shared.font.bodyMedium)
       .foregroundColor(Theme.shared.color.onSurfaceVariant)
+      .fixedSize(horizontal: false, vertical: true)
   }
   .frame(maxWidth: .infinity, alignment: .leading)
+}
+
+@MainActor
+@ViewBuilder
+private func gitHubLinkButton(url: URL) -> some View {
+  Button {
+    url.open()
+  } label: {
+    HStack(spacing: SPACING_MEDIUM_SMALL) {
+      Image(systemName: "link")
+        .foregroundColor(Theme.shared.color.primary)
+
+      Text(.sourceRepository)
+        .typography(Theme.shared.font.bodyMedium)
+        .foregroundColor(Theme.shared.color.primary)
+        .fixedSize(horizontal: false, vertical: true)
+
+      Spacer()
+
+      Image(systemName: "arrow.up.right")
+        .font(.caption)
+        .foregroundColor(Theme.shared.color.onSurfaceVariant)
+    }
+    .padding(SPACING_MEDIUM)
+    .background(Theme.shared.color.surfaceVariant.opacity(0.5))
+    .cornerRadius(Theme.shared.shape.small)
+  }
 }
 
 @MainActor
@@ -166,6 +227,7 @@ private func dismissSection(
         Text(.introDontShowAgain)
           .typography(Theme.shared.font.bodyMedium)
           .foregroundColor(Theme.shared.color.onSurface)
+          .fixedSize(horizontal: false, vertical: true)
         Spacer()
       }
     }
@@ -180,5 +242,4 @@ private func dismissSection(
         .cornerRadius(Theme.shared.shape.small)
     }
   }
-  .padding(.top, SPACING_MEDIUM)
 }
