@@ -127,16 +127,16 @@ private func headerSection(
       Text(verbatim: appName)
         .typography(Theme.shared.font.titleMedium)
         .bold()
-        .foregroundColor(Theme.shared.color.onSurface)
+        .foregroundColor(Theme.shared.color.primaryLabel)
         .lineLimit(1)
         .minimumScaleFactor(0.75)
 
       Text(verbatim: "v\(appVersion)")
         .typography(Theme.shared.font.labelSmall)
-        .foregroundColor(Theme.shared.color.onSurfaceVariant)
+        .foregroundColor(Theme.shared.color.secondaryLabel)
         .padding(.horizontal, SPACING_SMALL)
         .padding(.vertical, 2)
-        .background(Theme.shared.color.surfaceVariant.opacity(0.5))
+        .background(Theme.shared.color.fill)
         .cornerRadius(SPACING_EXTRA_SMALL)
     }
 
@@ -155,12 +155,12 @@ private func sectionView(
     Text(title)
       .typography(Theme.shared.font.titleSmall)
       .bold()
-      .foregroundColor(Theme.shared.color.onSurface)
+      .foregroundColor(Theme.shared.color.primaryLabel)
       .fixedSize(horizontal: false, vertical: true)
 
     Text(body)
       .typography(Theme.shared.font.bodyMedium)
-      .foregroundColor(Theme.shared.color.onSurfaceVariant)
+      .foregroundColor(Theme.shared.color.secondaryLabel)
       .fixedSize(horizontal: false, vertical: true)
   }
   .frame(maxWidth: .infinity, alignment: .leading)
@@ -174,21 +174,21 @@ private func gitHubLinkButton(url: URL) -> some View {
   } label: {
     HStack(spacing: SPACING_MEDIUM_SMALL) {
       Image(systemName: "link")
-        .foregroundColor(Theme.shared.color.primary)
+        .foregroundColor(Theme.shared.color.accent)
 
       Text(.sourceRepository)
         .typography(Theme.shared.font.bodyMedium)
-        .foregroundColor(Theme.shared.color.primary)
+        .foregroundColor(Theme.shared.color.accent)
         .fixedSize(horizontal: false, vertical: true)
 
       Spacer()
 
       Image(systemName: "arrow.up.right")
         .font(.caption)
-        .foregroundColor(Theme.shared.color.onSurfaceVariant)
+        .foregroundColor(Theme.shared.color.secondaryLabel)
     }
     .padding(SPACING_MEDIUM)
-    .background(Theme.shared.color.surfaceVariant.opacity(0.5))
+    .background(Theme.shared.color.fill)
     .cornerRadius(Theme.shared.shape.small)
   }
 }
@@ -209,12 +209,12 @@ private func dismissFooter(
           Image(systemName: isChecked ? "checkmark.square.fill" : "square")
             .foregroundColor(
               isChecked
-              ? Theme.shared.color.primary
-              : Theme.shared.color.onSurfaceVariant
+              ? Theme.shared.color.accent
+              : Theme.shared.color.secondaryLabel
             )
           Text(.introDontShowAgain)
             .typography(Theme.shared.font.bodyMedium)
-            .foregroundColor(Theme.shared.color.onSurface)
+            .foregroundColor(Theme.shared.color.primaryLabel)
             .fixedSize(horizontal: false, vertical: true)
           Spacer()
         }
@@ -223,10 +223,10 @@ private func dismissFooter(
       Button(action: onContinue) {
         Text(.introContinue)
           .typography(Theme.shared.font.labelLarge)
-          .foregroundColor(Theme.shared.color.onPrimary)
+          .foregroundColor(Theme.shared.color.white)
           .frame(maxWidth: .infinity)
           .padding(.vertical, SPACING_MEDIUM)
-          .background(Theme.shared.color.primary)
+          .background(Theme.shared.color.accent)
           .cornerRadius(Theme.shared.shape.small)
       }
     }
