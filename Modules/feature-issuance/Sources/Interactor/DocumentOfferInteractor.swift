@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -143,7 +143,7 @@ final actor DocumentOfferInteractorImpl: DocumentOfferInteractor {
       }
 
     } catch {
-      return .failure(error)
+      return error.isIssuerNotTrusted ? .issuerNotTrusted : .failure(error)
     }
   }
 
@@ -196,7 +196,7 @@ final actor DocumentOfferInteractorImpl: DocumentOfferInteractor {
       }
 
     } catch {
-      return .failure(error)
+      return error.isIssuerNotTrusted ? .issuerNotTrusted : .failure(error)
     }
   }
 
@@ -314,11 +314,13 @@ public enum OfferResultPartialState: Sendable {
   case partialSuccess(AppRoute)
   case deferredSuccess(AppRoute)
   case dynamicIssuance(RemoteSessionCoordinator)
+  case issuerNotTrusted
   case failure(Error)
 }
 
 public enum OfferDynamicIssuancePartialState: Sendable {
   case success(AppRoute)
+  case issuerNotTrusted
   case noPending
   case failure(Error)
 }

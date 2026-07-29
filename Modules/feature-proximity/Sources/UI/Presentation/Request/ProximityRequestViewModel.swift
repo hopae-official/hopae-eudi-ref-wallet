@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -52,8 +52,7 @@ final class ProximityRequestViewModel<Router: RouterHost>: BaseRequestViewModel<
         $0.copy(
           contentHeaderConfig: .init(
             appIconAndTextData: AppIconAndTextData(
-              appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet,
-              appText: ThemeManager.shared.image.euditext
+              appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet
             ),
             description: .dataSharingTitle,
             mainText: getTitle(),
@@ -65,6 +64,8 @@ final class ProximityRequestViewModel<Router: RouterHost>: BaseRequestViewModel<
           )
         )
       }
+    case .notSecuredRequest:
+      self.onVerifierNotTrusted()
     case .failure(let error):
       self.onEmptyDocuments(error: error.errorMessage)
     }
@@ -99,6 +100,7 @@ final class ProximityRequestViewModel<Router: RouterHost>: BaseRequestViewModel<
           navigationTitle: .biometryConfirmRequest,
           caption: .requestDataShareBiometryCaption,
           quickPinOnlyCaption: .requestDataShareQuickPinCaption,
+          pinTextFieldTitle: .enterYourPin,
           navigationSuccessType: .push(
             .featureProximityModule(
               .proximityLoader(
@@ -121,6 +123,10 @@ final class ProximityRequestViewModel<Router: RouterHost>: BaseRequestViewModel<
   override func getPopRoute() -> AppRoute? {
     publisherTask?.cancel()
     return getOriginator()
+  }
+
+  override func stopPresentation() async {
+    await interactor.stopPresentation()
   }
 
   override func getTitle() -> LocalizableStringKey {

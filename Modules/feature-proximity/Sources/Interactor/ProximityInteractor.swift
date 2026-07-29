@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -34,6 +34,7 @@ public enum ProximityResponsePreparationPartialState: Sendable {
 
 public enum ProximityRequestPartialState: Sendable {
   case success([RequestDataUiModel], relyingParty: String, dataRequestInfo: String, isTrusted: Bool)
+  case notSecuredRequest
   case failure(Error)
 }
 
@@ -120,7 +121,7 @@ final actor ProximityInteractorImpl: ProximityInteractor {
     do {
       let response = try await sessionCoordinatorHolder.getActiveProximityCoordinator().requestReceived()
       let revokedDocuments = (try? await walletKitController.fetchRevokedDocuments()) ?? []
-      let documents = response.items.filter { item in !revokedDocuments.contains(where: { $0 == item.docId }) }
+      let documents = (response.itemSets.first ?? []).filter { item in !revokedDocuments.contains(where: { $0 == item.docId }) }
       guard !documents.isEmpty else { return .failure(WalletCoreError.unableFetchDocuments) }
       return .success(
         documents.toUiModels(
@@ -131,7 +132,7 @@ final actor ProximityInteractorImpl: ProximityInteractor {
         isTrusted: response.isTrusted
       )
     } catch {
-      return .failure(error)
+      return error.isIssuerNotTrusted ? .notSecuredRequest : .failure(error)
     }
   }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -39,8 +39,8 @@ final class PresentationRequestViewModel<Router: RouterHost>: BaseRequestViewMod
 
     switch result {
     case .success(let authenticationRequest):
-      self.onReceivedItems(
-        with: authenticationRequest.requestDataCells,
+      self.onReceivedCombinations(
+        with: authenticationRequest.requestDataCombinations,
         title: .requestDataTitle(
           [authenticationRequest.relyingParty]
         ),
@@ -51,8 +51,7 @@ final class PresentationRequestViewModel<Router: RouterHost>: BaseRequestViewMod
         $0.copy(
           contentHeaderConfig: .init(
             appIconAndTextData: AppIconAndTextData(
-              appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet,
-              appText: ThemeManager.shared.image.euditext
+              appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet
             ),
             description: .dataSharingTitle,
             mainText: getTitle(),
@@ -64,6 +63,8 @@ final class PresentationRequestViewModel<Router: RouterHost>: BaseRequestViewMod
           )
         )
       }
+    case .notSecuredRequest:
+      self.onVerifierNotTrusted()
     case .failure(let error):
       self.onEmptyDocuments(error: error.errorMessage)
     }
@@ -99,6 +100,7 @@ final class PresentationRequestViewModel<Router: RouterHost>: BaseRequestViewMod
           navigationTitle: .biometryConfirmRequest,
           caption: .requestDataShareBiometryCaption,
           quickPinOnlyCaption: .requestDataShareQuickPinCaption,
+          pinTextFieldTitle: .enterYourPin,
           navigationSuccessType: .push(
             .featurePresentationModule(
               .presentationLoader(
@@ -120,6 +122,10 @@ final class PresentationRequestViewModel<Router: RouterHost>: BaseRequestViewMod
 
   override func getPopRoute() -> AppRoute? {
     return getOriginator()
+  }
+
+  override func stopPresentation() async {
+    await interactor.stopPresentation()
   }
 
   override func getTitle() -> LocalizableStringKey {

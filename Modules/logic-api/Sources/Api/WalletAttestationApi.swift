@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -29,12 +29,12 @@ struct WalletInstanceAttestationApi: NetworkRequest {
   let host: String
 }
 
-struct WalletUnitAttestationApi: NetworkRequest {
-  typealias Response = WalletUnitAttestation
+struct WalletKeyAttestationApi: NetworkRequest {
+  typealias Response = WalletKeyAttestation
 
   var method: NetworkMethod { .POST }
   var additionalHeaders: [String: String] {[:]}
-  var path: String { "wallet-unit-attestation/jwk-set" }
+  var path: String { "key-attestation/jwk-set" }
 
   var body: Data? {
     return request

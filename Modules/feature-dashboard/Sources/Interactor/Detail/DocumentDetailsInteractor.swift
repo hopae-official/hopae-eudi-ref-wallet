@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -18,6 +18,7 @@ import feature_common
 
 public protocol DocumentDetailsInteractor: Sendable {
   func fetchStoredDocument(documentId: String) async -> DocumentDetailsPartialState
+  func reIssueDocument(identifier: String) async -> DocumentDetailsReIssuancePartialState
   func deleteDocument(with documentId: String, and type: DocumentTypeIdentifier) async -> DocumentDetailsDeletionPartialState
   func save(_ identifier: String) async throws
   func delete(_ identifier: String) async throws
@@ -47,14 +48,26 @@ final actor DocumentDetailsInteractorImpl: DocumentDetailsInteractor {
     let isBookmarked = await walletController.isDocumentBookmarked(with: documentId)
     let isRevoked = await walletController.isDocumentRevoked(with: documentId)
 
-    let documentIsLowOnCredentials = await walletController.isDocumentLowOnCredentials(document: document)
-    let info = getCredentialsUsageCount(
-      credentialsUsageCounts: document?.credentialsUsageCounts,
-      documentIsLowOnCredentials: documentIsLowOnCredentials
-    )
     let issuerDetailsCard = document?.transformToIssuerDetailsCardDataUi(isRevoked: isRevoked)
 
-    return .success(documentDetails, issuerDetailsCard, info, isBookmarked)
+    if isBatchCounterEnabled() {
+      let info = documentCredentialsInfoUi(usageCounts: document?.credentialsUsageCounts)
+      return .success(documentDetails, issuerDetailsCard, info, isBookmarked, isRevoked)
+    }
+
+    return .success(documentDetails, issuerDetailsCard, nil, isBookmarked, isRevoked)
+  }
+
+  func reIssueDocument(identifier: String) async -> DocumentDetailsReIssuancePartialState {
+    do {
+      _ = try await walletController.reIssueDocument(
+        identifier: identifier,
+        isBackgroundOperation: false
+      )
+      return .success
+    } catch {
+      return error.isIssuerNotTrusted ? .issuerNotTrusted : .failure(error)
+    }
   }
 
   func deleteDocument(with documentId: String, and type: DocumentTypeIdentifier) async -> DocumentDetailsDeletionPartialState {
@@ -81,7 +94,7 @@ final actor DocumentDetailsInteractorImpl: DocumentDetailsInteractor {
     do {
 
       if await shouldDeleteAllDocuments(type: type) {
-        await walletController.clearAllDocuments()
+        try await walletController.clearAllDocuments()
         successState = .success(shouldReboot: true)
       } else {
         try await walletController.deleteDocument(with: documentId, status: .issued)
@@ -102,17 +115,6 @@ final actor DocumentDetailsInteractorImpl: DocumentDetailsInteractor {
     try await walletController.removeBookmarkedDocument(with: identifier)
   }
 
-  private func getCredentialsUsageCount(
-    credentialsUsageCounts: CredentialsUsageCounts?,
-    documentIsLowOnCredentials: Bool
-  ) -> DocumentCredentialsInfoUi? {
-    if let usageCounts = credentialsUsageCounts {
-      return documentCredentialsInfoUi(usageCounts: usageCounts)
-    } else {
-      return nil
-    }
-  }
-
   private func documentCredentialsInfoUi(
     usageCounts: CredentialsUsageCounts? = nil
   ) -> DocumentCredentialsInfoUi {
@@ -123,17 +125,33 @@ final actor DocumentDetailsInteractorImpl: DocumentDetailsInteractor {
     return DocumentCredentialsInfoUi(
       availableCredentials: availableCredentials,
       totalCredentials: totalCredentials,
-      title: .documentDetailsDocumentCredentialsText([availableCredentials.string, totalCredentials.string]),
+      title: .documentDetailsDocumentCredentialsText([availableCredentials.string, totalCredentials.string])
     )
+  }
+
+  private func isBatchCounterEnabled() -> Bool {
+    prefsController.getBool(forKey: .batchCounter)
   }
 }
 
 public enum DocumentDetailsPartialState: Sendable {
-  case success(DocumentUIModel, IssuerDocumentDetailsCardUIModel?, DocumentCredentialsInfoUi?, Bool)
+  case success(
+    DocumentUIModel,
+    IssuerDocumentDetailsCardUIModel?,
+    DocumentCredentialsInfoUi?,
+    Bool,
+    Bool
+  )
   case failure(Error)
 }
 
 public enum DocumentDetailsDeletionPartialState: Sendable {
   case success(shouldReboot: Bool)
+  case failure(Error)
+}
+
+public enum DocumentDetailsReIssuancePartialState: Sendable {
+  case success
+  case issuerNotTrusted
   case failure(Error)
 }

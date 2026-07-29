@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -31,6 +31,7 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case requestDataCaption
   case requestDataInfoNotice
   case requestDataTitle([String])
+  case requestCombinationTitle([String])
   case documentAdded
   case requestDataSheetCaption
   case okButton
@@ -56,6 +57,7 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case changeQuickPinOption
   case quickPinSetTitle
   case quickPinEnterPin
+  case quickPinNavigationEnterPin
   case quickPinConfirmPin
   case quickPinSetCaptionOne
   case quickPinSetCaptionTwo
@@ -64,11 +66,13 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case quickPinSetSuccess
   case quickPinSetNoActivationSuccess
   case loginTitle
+  case loginWithBiometrics
   case loginCaptionQuickPinOnly
   case loginCaption
   case quickPinSetSuccessButton
   case quickPinSetNoActivationSuccessButton
   case quickPinDoNotMatch
+  case quickPinLockedOut([String])
   case quickPinUpdateTitle
   case quickPinUpdateCaptionOne
   case quickPinUpdateCaptionTwo
@@ -133,7 +137,7 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case itemsNotFoundInStorage
   case home
   case documents
-  case transactions
+  case historyTitle
   case authenticateAuthoriseTransactions
   case electronicallySignDigitalDocuments
   case learnMore
@@ -207,6 +211,7 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case filterByDate
   case startDate
   case endDate
+  case resetDates
   case relyingParty
   case signedDocuments
   case transactionInformation
@@ -225,6 +230,7 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case presentation
   case signing
   case issuance
+  case deletion
   case withoutRelyingName
   case errorFetchTransactionLog
   case incomplete
@@ -232,6 +238,10 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case revoked
   case revokedModalTitle
   case revokedModalDescription
+  case issuanceBlockedTitle
+  case issuanceBlockedMessage
+  case presentationBlockedTitle
+  case presentationBlockedMessage
   case transactionDetailsRequestDeletionMessage
   case transactionDetailsRequestDeletionButton
   case transactionDetailsReportTransactionMessage
@@ -259,15 +269,24 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case unknown
   case pidCombined
   case documentData
+  case documentDetailsShow
+  case documentDetailsHide
   case issuanceSuccessHeaderDescription
   case documentDetailsReIssueButton
   case documentDetailsRemoveButton
   case documentDetailsExpiresOn([String])
+  case documentDetailsExpiredOn([String])
   case documentDetailsIssuedOn([String])
   case documentDetailsRevokedDocument
   case documentDetailsIssuerCardIssuedMessageText
   case documentDetailsIssuerCardRevokedMessageText
+  case documentDetailsIssuerCardExpiredMessageText
   case documentDetailsIssuerCardIssuedActionButtonText
+  case batchIssuanceCounter
+  case documentProviderExtensionAcceptButton
+  case documentProviderExtensionRejectButton
+  case enterYourPin
+  case homeScreenAuthenticateDescription
 }
 
 public extension LocalizableStringKey {

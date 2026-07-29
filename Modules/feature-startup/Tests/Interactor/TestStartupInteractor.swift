@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -212,7 +212,7 @@ private extension TestStartupInteractor {
 
   func biometryConfig(with hasDocuments: Bool) -> UIConfig.Biometry {
     return UIConfig.Biometry(
-      navigationTitle: .custom(""),
+      navigationTitle: .enterYourPin,
       title: .loginTitle,
       caption: .loginCaption,
       quickPinOnlyCaption: .loginCaptionQuickPinOnly,
@@ -223,7 +223,8 @@ private extension TestStartupInteractor {
       ),
       navigationBackType: nil,
       isPreAuthorization: true,
-      shouldInitializeBiometricOnCreate: true
+      shouldInitializeBiometricOnCreate: true,
+      displayNavigationBar: true
     )
   }
 
@@ -245,9 +246,9 @@ private extension TestStartupInteractor {
     }
   }
 
-  func stubKeyChainClear() {
+  func stubKeyChainClear(success: Bool = true) {
     stub(keyChainController) { mock in
-      when(mock.clear()).thenDoNothing()
+      when(mock.clear()).thenReturn(success)
     }
   }
 

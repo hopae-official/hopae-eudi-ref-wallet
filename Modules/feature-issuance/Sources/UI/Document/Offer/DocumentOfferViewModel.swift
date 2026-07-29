@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -17,6 +17,7 @@ import Foundation
 import logic_ui
 import logic_resources
 import feature_common
+import Observation
 
 @Copyable
 struct DocumentOfferViewState: ViewState {
@@ -42,7 +43,10 @@ struct DocumentOfferViewState: ViewState {
   }
 }
 
+@Observable
 final class DocumentOfferViewModel<Router: RouterHost>: ViewModel<Router, DocumentOfferViewState> {
+
+  var isIssuerNotTrustedSheetShowing: Bool = false
 
   private let interactor: DocumentOfferInteractor
 
@@ -70,8 +74,7 @@ final class DocumentOfferViewModel<Router: RouterHost>: ViewModel<Router, Docume
         initialized: false,
         contentHeaderConfig: .init(
           appIconAndTextData: AppIconAndTextData(
-            appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet,
-            appText: ThemeManager.shared.image.euditext
+            appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet
           )
         )
       )
@@ -99,8 +102,7 @@ final class DocumentOfferViewModel<Router: RouterHost>: ViewModel<Router, Docume
           initialized: true,
           contentHeaderConfig: .init(
             appIconAndTextData: AppIconAndTextData(
-              appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet,
-              appText: ThemeManager.shared.image.euditext
+              appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet
             ),
             description: .dataSharingTitle,
             mainText: .issuanceRequest,
@@ -181,6 +183,9 @@ final class DocumentOfferViewModel<Router: RouterHost>: ViewModel<Router, Docume
             )
           )
         )
+      case .issuerNotTrusted:
+        setState { $0.copy(isLoading: false).copy(error: nil) }
+        isIssuerNotTrustedSheetShowing = true
       case .failure(let error):
         setState {
           $0.copy(
@@ -251,6 +256,9 @@ final class DocumentOfferViewModel<Router: RouterHost>: ViewModel<Router, Docume
       router.push(with: route)
     case .noPending:
       setState { $0.copy(isLoading: false) }
+    case .issuerNotTrusted:
+      setState { $0.copy(isLoading: false).copy(error: nil) }
+      isIssuerNotTrustedSheetShowing = true
     case .failure(let error):
       setState {
         $0.copy(
@@ -266,17 +274,9 @@ final class DocumentOfferViewModel<Router: RouterHost>: ViewModel<Router, Docume
 
   func toolbarContent() -> ToolBarContent {
     .init(
-      trailingActions: [
-        .init(
-          title: .issueButton,
-          accessibilityLocator: DocumentOfferLocators.issueButton
-        ) {
-          self.onIssueDocuments()
-        }
-      ],
       leadingActions: [
         .init(
-          title: .cancelButton,
+          image: Theme.shared.image.xmark,
           accessibilityLocator: DocumentOfferLocators.cancelButton
         ) {
           self.onPop()

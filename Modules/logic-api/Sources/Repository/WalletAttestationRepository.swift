@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -16,7 +16,7 @@
 import Foundation
 
 public protocol WalletAttestationRepository: Sendable {
-  func issueWalletUnitAttestation(host: String, payload: Data) async throws -> WalletUnitAttestation
+  func issueWalletKeyAttestation(host: String, payload: Data) async throws -> WalletKeyAttestation
   func issueWalletInstanceAttestation(host: String, payload: Data) async throws -> WalletInstanceAttestation
 }
 
@@ -28,8 +28,8 @@ final class WalletAttestationRepositoryImpl: WalletAttestationRepository {
     self.networkManager = networkManager
   }
 
-  func issueWalletUnitAttestation(host: String, payload: Data) async throws -> WalletUnitAttestation {
-    try await networkManager.execute(with: WalletUnitAttestationApi(request: payload, host: host), parameters: nil)
+  func issueWalletKeyAttestation(host: String, payload: Data) async throws -> WalletKeyAttestation {
+    try await networkManager.execute(with: WalletKeyAttestationApi(request: payload, host: host), parameters: nil)
   }
 
   func issueWalletInstanceAttestation(host: String, payload: Data) async throws -> WalletInstanceAttestation {

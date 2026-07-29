@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -21,6 +21,7 @@ import XCTest
 @testable import feature_common
 @testable import feature_issuance
 import OpenID4VCI
+import EudiWalletKit
 
 final class TestDocumentOfferInteractor: EudiTest {
   
@@ -325,6 +326,106 @@ final class TestDocumentOfferInteractor: EudiTest {
     }
   }
   
+  func testIssueDocuments_WhenWalletThrowsTrustError_ThenReturnsIssuerNotTrusted() async {
+    // Given
+    let config = UIConfig.TwoWayNavigationType.push(
+      .featureCommonModule(
+        .genericSuccess(config: UIConfig.Success(
+          title: .init(value: .addDocumentTitle),
+          subtitle: .addDocumentTitle,
+          buttons: [],
+          visualKind: UIConfig.Success.VisualKind.defaultIcon)
+        )
+      )
+    )
+
+    let uri = "uri"
+    let txCodeValue = "txCodeValue"
+
+    stub(walletKitController) { mock in
+      mock.issueDocumentsByOfferUrl(
+        offerUri: uri,
+        docTypes: any(),
+        txCodeValue: txCodeValue
+      )
+      .thenThrow(WalletError(description: "issuer not trusted", code: .trustError))
+    }
+
+    // When
+    let result = await interactor.issueDocuments(
+      with: uri,
+      issuerName: "issuerName",
+      docOffers: [],
+      successNavigation: config,
+      txCodeValue: txCodeValue
+    )
+
+    // Then
+    switch result {
+    case .issuerNotTrusted:
+      XCTAssertTrue(true)
+    default:
+      XCTFail("Expected .issuerNotTrusted but got \(result)")
+    }
+  }
+
+  func testResumeDynamicIssuance_WhenWalletThrowsTrustError_ThenReturnsIssuerNotTrusted() async {
+    // Given
+    let config = IssuanceCodeUiConfig(
+      offerUri: "",
+      issuerName: "Issuer Name",
+      txCodeLength: 6,
+      docOffers: [],
+      successNavigation: .popTo(
+        .featureIssuanceModule(
+          .credentialOfferRequest(config: NoConfig())
+        )
+      ),
+      navigationCancelType: .pop
+    )
+
+    let document = Document(
+      id: "doc-id",
+      docType: "type",
+      docDataFormat: .sdjwt,
+      data: Data(),
+      docKeyInfo: nil,
+      createdAt: Date(),
+      metadata: nil,
+      displayName: "My Document",
+      status: .issued
+    )
+
+    let mockPendingData = DynamicIssuancePendingData(
+      pendingDoc: document,
+      url: URL(filePath: "someURL")!
+    )
+
+    stub(walletKitController) { mock in
+      when(mock.getDynamicIssuancePendingData()).thenReturn(mockPendingData)
+
+      when(mock.resumePendingIssuance(
+        pendingDoc: any(),
+        webUrl: any()
+      ))
+      .thenThrow(WalletError(description: "issuer not trusted", code: .trustError))
+    }
+
+    // When
+    let result = await interactor.resumeDynamicIssuance(
+      issuerName: config.issuerName,
+      successNavigation: config.successNavigation
+    )
+
+    // Then
+    switch result {
+    case .issuerNotTrusted:
+      XCTAssertTrue(true)
+    default:
+      XCTFail("Expected .issuerNotTrusted but got \(result)")
+    }
+  }
+
   func testIssueDocuments_WhenIssueDocumentsByOfferUrl_ThenReturnFailure() async {
     // Given
     let config = UIConfig.TwoWayNavigationType.push(
@@ -671,6 +772,106 @@ final class TestDocumentOfferInteractor: EudiTest {
     XCTAssertEqual(mock.docOffers.count, 0)
   }
   
+  func testProcessOfferRequest_WhenTxCodeLengthOutOfRange_ThenReturnsTransactionCodeFormatFailure() async {
+    // Given: an offer with txCodeSpec.length outside the 4...6 range hits the
+    // failure branch in processOfferRequest (lines 59-63).
+    let uri = "uri"
+    let offer = OfferedIssuanceModel(
+      issuerName: "issuerName",
+      issuerLogoUrl: "https://logo",
+      docModels: [],
+      txCodeSpec: TxCode(inputMode: .numeric, length: 3, description: "")
+    )
+    stub(walletKitController) { mock in
+      mock.resolveOfferUrlDocTypes(offerUri: uri).thenReturn(offer)
+      mock.fetchIssuedDocuments(with: any()).thenReturn([Constants.createEuPidModel()])
+    }
+
+    // When
+    let result = await interactor.processOfferRequest(with: uri)
+
+    // Then
+    switch result {
+    case .failure(let error):
+      if case .transactionCodeFormat = error as? WalletCoreError {
+        XCTAssertTrue(true)
+      } else {
+        XCTFail("Expected .transactionCodeFormat, got \(error)")
+      }
+    default:
+      XCTFail("Expected failure, got \(result)")
+    }
+  }
+
+  func testProcessOfferRequest_WhenTxCodeInputModeIsText_ThenReturnsTransactionCodeFormatFailure() async {
+    // Given: inputMode == .text also trips the txCode guard regardless of length.
+    let uri = "uri"
+    let offer = OfferedIssuanceModel(
+      issuerName: "issuerName",
+      issuerLogoUrl: "https://logo",
+      docModels: [],
+      txCodeSpec: TxCode(inputMode: .text, length: 5, description: "")
+    )
+    stub(walletKitController) { mock in
+      mock.resolveOfferUrlDocTypes(offerUri: uri).thenReturn(offer)
+      mock.fetchIssuedDocuments(with: any()).thenReturn([Constants.createEuPidModel()])
+    }
+
+    // When
+    let result = await interactor.processOfferRequest(with: uri)
+
+    // Then
+    switch result {
+    case .failure(let error):
+      if case .transactionCodeFormat = error as? WalletCoreError {
+        XCTAssertTrue(true)
+      } else {
+        XCTFail("Expected .transactionCodeFormat, got \(error)")
+      }
+    default:
+      XCTFail("Expected failure, got \(result)")
+    }
+  }
+
+  func testProcessOfferRequest_WhenForcePidActivationButNoPidStoredOrOffered_ThenMissingPidFailure() async {
+    // Given: forcePidActivation is true (default stub), no PID is stored,
+    // and the offer contains no PID document types. Hits the missingPid
+    // failure branch (lines 78-80).
+    let uri = "uri"
+    let nonPidOffer = OfferedDocModel(
+      credentialConfigurationIdentifier: "non-pid-id",
+      docType: "non-pid-doctype",
+      scope: "scope",
+      identifier: "identifier",
+      displayName: "Other Doc",
+      algValuesSupported: [],
+      claims: [],
+      credentialOptions: .init(credentialPolicy: .oneTimeUse, batchSize: 1),
+      keyOptions: nil
+    )
+    let offer = OfferedIssuanceModel(
+      issuerName: "issuerName",
+      issuerLogoUrl: "https://logo",
+      docModels: [nonPidOffer],
+      txCodeSpec: nil
+    )
+    stub(walletKitController) { mock in
+      mock.resolveOfferUrlDocTypes(offerUri: uri).thenReturn(offer)
+      mock.fetchIssuedDocuments(with: any()).thenReturn([])
+    }
+
+    // When
+    let result = await interactor.processOfferRequest(with: uri)
+
+    // Then
+    switch result {
+    case .failure(let error):
+      XCTAssertEqual(error as? WalletCoreError, WalletCoreError.missingPid)
+    default:
+      XCTFail("Expected missingPid failure, got \(result)")
+    }
+  }
+
   func testProcessOfferRequest_WhenResolveOfferUrlDocTypes_ThenReturnSuccess() async {
     // Given
     let expectedDocumentOfferUIModel = DocumentOfferUIModel(

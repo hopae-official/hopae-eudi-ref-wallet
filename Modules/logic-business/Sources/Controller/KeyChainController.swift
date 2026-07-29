@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -14,6 +14,7 @@
  * governing permissions and limitations under the Licence.
  */
 import Foundation
+import Security
 @preconcurrency import KeychainAccess
 
 public protocol KeyChainWrapper {
@@ -28,13 +29,25 @@ public protocol KeyChainController: Sendable {
   func removeObject(key: KeyChainWrapper)
   func validateKeyChainBiometry() throws
   func clearKeyChainBiometry()
-  func clear()
+  @discardableResult func clear() -> Bool
 }
 
 final class KeyChainControllerImpl: KeyChainController {
 
   private let biometryKey = "eu.europa.ec.euidi.biometric.access"
-  private let keyChain: Keychain = Keychain()
+  private let configLogic: ConfigLogic
+  private let keyChain: Keychain
+
+  public init(configLogic: ConfigLogic) {
+    self.configLogic = configLogic
+    let accessGroup = configLogic.keyChainConfig.keychainAccessGroup
+    let service = configLogic.keyChainConfig.documentStorageServiceName
+    keyChain = Keychain(
+      service: service,
+      accessGroup: accessGroup
+    )
+    .accessibility(.whenUnlocked)
+  }
 
   public func storeValue(key: KeyChainWrapper, value: String) {
     keyChain[key.value] = value
@@ -65,12 +78,27 @@ final class KeyChainControllerImpl: KeyChainController {
     try? self.keyChain.remove(self.biometryKey)
   }
 
-  public func clear() {
+  @discardableResult
+  public func clear() -> Bool {
     try? keyChain.removeAll()
+    return clearDocumentStorage()
   }
 }
 
 private extension KeyChainControllerImpl {
+  func clearDocumentStorage() -> Bool {
+    var query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecUseDataProtectionKeychain as String: true
+    ]
+    let accessGroup = configLogic.keyChainConfig.keychainAccessGroup
+    if !accessGroup.isEmpty {
+      query[kSecAttrAccessGroup as String] = accessGroup
+    }
+    let status = SecItemDelete(query as CFDictionary)
+    return status == errSecSuccess || status == errSecItemNotFound
+  }
+
   func setBiometricKey() throws {
     try self.keyChain
       .accessibility(

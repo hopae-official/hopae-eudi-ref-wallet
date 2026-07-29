@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -33,12 +33,20 @@ public struct BaseRequestView<Router: RouterHost>: View {
       navigationTitle: .dataSharingRequest,
       toolbarContent: viewModel.toolbarContent()
     ) {
-      content(
+      BaseRequestViewContainer(
         viewState: viewModel.viewState,
         onShare: viewModel.onShare,
         onSelectionChanged: { id in
           Task {
             await viewModel.onSelectionChanged(id: id)
+          }
+        },
+        onCombinationSelected: { index in
+          viewModel.onCombinationSelected(index: index)
+        },
+        onCombinationItemClick: { index, id in
+          Task {
+            await viewModel.onCombinationItemClick(combinationIndex: index, id: id)
           }
         }
       )
@@ -78,102 +86,176 @@ public struct BaseRequestView<Router: RouterHost>: View {
         Button(.okButton) {}
       }
     )
+    .sheetDialog(isPresented: $viewModel.isVerifierNotTrustedSheetShowing) {
+      TrustBlockedSheetContent(
+        title: .presentationBlockedTitle,
+        message: .presentationBlockedMessage,
+        onClose: { viewModel.onVerifierNotTrustedClose() }
+      )
+    }
   }
 }
 
-@MainActor
-@ViewBuilder
-private func content(
-  viewState: RequestViewState,
-  onShare: @escaping () -> Void,
-  onSelectionChanged: @escaping (String) -> Void
-) -> some View {
-  let errorTitle =
-    viewState.errorTitle
-    ?? (viewState.items.isEmpty ? .requestDataNoDocument : nil)
+private struct BaseRequestViewContainer: View {
 
-  if let errorTitle {
-    noDocumentsFound(
-        contentHeaderConfig: viewState.contentHeaderConfig,
-        errorTitle: errorTitle
-    )
-  } else {
-    scrollableContent(
-      viewState: viewState,
-      onShare: onShare,
-      onSelectionChanged: onSelectionChanged
+  let viewState: RequestViewState
+  let onShare: () -> Void
+  let onSelectionChanged: (String) -> Void
+  var onCombinationSelected: (Int) -> Void = { _ in }
+  var onCombinationItemClick: (Int, String) -> Void = { _, _ in }
+
+  var body: some View {
+    content()
+  }
+
+  @MainActor
+  @ViewBuilder
+  private func content() -> some View {
+    let errorTitle =
+      viewState.errorTitle
+      ?? (viewState.items.isEmpty ? .requestDataNoDocument : nil)
+
+    if let errorTitle {
+      noDocumentsFound(errorTitle: errorTitle)
+    } else {
+      scrollableContent()
+    }
+  }
+
+  @MainActor
+  @ViewBuilder
+  private func scrollableContent() -> some View {
+    ScrollView {
+      VStack(spacing: .zero) {
+        ContentHeaderView(
+          config: viewState.contentHeaderConfig,
+          accessibilityDescription: BaseRequestLocators.description
+        )
+        .padding(.horizontal, Theme.shared.dimension.padding)
+
+        ZStack {
+          VStack(alignment: .leading, spacing: SPACING_MEDIUM) {
+
+            if viewState.combinations.count > 1 {
+              combinationsContent()
+            } else {
+              singleCombinationContent()
+            }
+
+            Text(.shareDataReview)
+              .typography(Theme.shared.font.bodyMedium)
+              .foregroundColor(Theme.shared.color.primaryLabel)
+              .multilineTextAlignment(.leading)
+              .shimmer(isLoading: viewState.isLoading)
+
+            VSpacer.medium()
+          }
+          .padding(.top, Theme.shared.dimension.padding)
+        }
+        .padding(Theme.shared.dimension.padding)
+      }
+    }
+    .safeAreaInset(edge: .bottom) {
+      shareButton()
+    }
+  }
+
+  @MainActor
+  @ViewBuilder
+  private func singleCombinationContent() -> some View {
+    ForEach(viewState.items.indices, id: \.self) { index in
+      documentSection(
+        viewState.items[index],
+        onItemClick: { onSelectionChanged($0) }
+      )
+      .accessibilityElement()
+      .combineChilrenAccessibility(
+        locator: BaseRequestLocators.requestedDocument(index.string)
+      )
+    }
+  }
+
+  @MainActor
+  @ViewBuilder
+  private func combinationsContent() -> some View {
+    ForEach(viewState.combinations.indices, id: \.self) { index in
+      WrapSelectableCardView(
+        title: .requestCombinationTitle(["\(index + 1)", "\(viewState.combinations.count)"]),
+        isSelected: index == viewState.selectedCombinationIndex,
+        onSelected: { onCombinationSelected(index) },
+        content: {
+          VStack(alignment: .leading, spacing: SPACING_MEDIUM) {
+            ForEach(viewState.combinations[index].indices, id: \.self) { sectionIndex in
+              documentSection(
+                viewState.combinations[index][sectionIndex],
+                onItemClick: { onCombinationItemClick(index, $0) }
+              )
+            }
+          }
+        }
+      )
+      .accessibilityElement()
+      .combineChilrenAccessibility(
+        locator: BaseRequestLocators.requestedDocument(index.string)
+      )
+    }
+  }
+
+  @MainActor
+  @ViewBuilder
+  private func documentSection(
+    _ section: RequestDataUiModel,
+    onItemClick: @escaping (String) -> Void
+  ) -> some View {
+    WrapExpandableListView(
+      header: .init(
+        mainContent: .text(.custom(section.section.title)),
+        supportingText: .viewDetails
+      ),
+      items: section.section.listItems,
+      backgroundColor: Theme.shared.color.groupedElevatedBackground,
+      hideSensitiveContent: false,
+      isLoading: viewState.isLoading,
+      onItemClick: { onItemClick($0.groupId) }
     )
   }
-}
 
-@MainActor
-@ViewBuilder
-private func scrollableContent(
-  viewState: RequestViewState,
-  onShare: @escaping () -> Void,
-  onSelectionChanged: @escaping (String) -> Void
-) -> some View {
-  ScrollView {
+  @MainActor
+  @ViewBuilder
+  private func shareButton() -> some View {
+    WrapButtonView(
+      style: .primary,
+      title: .shareButton,
+      isLoading: viewState.isLoading,
+      isEnabled: viewState.allowShare,
+      onAction: onShare()
+    )
+    .combineChilrenAccessibility(
+      locator: BaseRequestLocators.shareButton
+    )
+    .padding(.horizontal, SPACING_MEDIUM)
+    .padding(.bottom, SPACING_LARGE_MEDIUM)
+  }
+
+  @MainActor
+  @ViewBuilder
+  private func noDocumentsFound(errorTitle: LocalizableStringKey) -> some View {
     VStack(spacing: .zero) {
       ContentHeaderView(
         config: viewState.contentHeaderConfig,
         accessibilityDescription: BaseRequestLocators.description
       )
-      ZStack {
-        VStack(alignment: .leading, spacing: SPACING_MEDIUM) {
+      .padding(.horizontal, Theme.shared.dimension.padding)
 
-          ForEach(viewState.items.indices, id: \.self) { index in
-            let section = viewState.items[index]
-            WrapExpandableListView(
-              header: .init(
-                mainContent: .text(.custom(section.section.title)),
-                supportingText: .viewDetails
-              ),
-              items: section.section.listItems,
-              hideSensitiveContent: false,
-              isLoading: viewState.isLoading,
-              onItemClick: { onSelectionChanged($0.groupId) }
-            )
-            .accessibilityElement()
-            .combineChilrenAccessibility(
-              locator: BaseRequestLocators.requestedDocument(index.string)
-            )
-          }
-
-          Text(.shareDataReview)
-            .typography(Theme.shared.font.bodyMedium)
-            .foregroundColor(Theme.shared.color.onSurface)
-            .multilineTextAlignment(.leading)
-            .shimmer(isLoading: viewState.isLoading)
-
-          VSpacer.medium()
-        }
-        .padding(.top, Theme.shared.dimension.padding)
+      VStack(spacing: .zero) {
+        Spacer()
+        ContentEmptyView(
+          title: errorTitle
+        )
+        Spacer()
       }
-      .padding(Theme.shared.dimension.padding)
+      .padding(.horizontal, Theme.shared.dimension.padding)
     }
-  }
-}
-
-@MainActor
-@ViewBuilder
-private func noDocumentsFound(
-  contentHeaderConfig: ContentHeaderConfig,
-  errorTitle: LocalizableStringKey
-) -> some View {
-  VStack(spacing: .zero) {
-    ContentHeaderView(
-      config: contentHeaderConfig,
-      accessibilityDescription: BaseRequestLocators.description
-    )
-    VStack(spacing: .zero) {
-      Spacer()
-      ContentEmptyView(
-        title: errorTitle
-      )
-      Spacer()
-    }
-    .padding(.horizontal, Theme.shared.dimension.padding)
   }
 }
 
@@ -184,6 +266,8 @@ private func noDocumentsFound(
     errorTitle: nil,
     showMissingCredentials: false,
     items: RequestDataUiModel.mockData(),
+    combinations: [RequestDataUiModel.mockData()],
+    selectedCombinationIndex: 0,
     trustedRelyingPartyInfo: .requestDataVerifiedEntityMessage,
     relyingParty: .custom("relying party"),
     isTrusted: true,
@@ -192,14 +276,13 @@ private func noDocumentsFound(
     initialized: true,
     contentHeaderConfig: .init(
       appIconAndTextData: AppIconAndTextData(
-        appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet,
-        appText: ThemeManager.shared.image.euditext
+        appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet
       )
     )
   )
 
   ContentScreenView {
-    content(
+    BaseRequestViewContainer(
       viewState: viewState,
       onShare: {},
       onSelectionChanged: { _ in }

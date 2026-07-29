@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -18,13 +18,13 @@ import logic_resources
 import feature_common
 import logic_core
 import OrderedCollections
+import Observation
 
 @Copyable
 struct AddDocumentViewState: ViewState {
   let addDocumentCellModels: OrderedDictionary<String, [AddDocumentUIModel]>
   let error: ContentErrorView.Config?
   let config: IssuanceFlowUiConfig
-  let showFooterScanner: Bool
 
   var isFlowCancellable: Bool {
     return config.isExtraDocumentFlow
@@ -38,7 +38,10 @@ struct AddDocumentViewState: ViewState {
   }
 }
 
+@Observable
 final class AddDocumentViewModel<Router: RouterHost>: ViewModel<Router, AddDocumentViewState> {
+
+  var isIssuerNotTrustedSheetShowing: Bool = false
 
   private let interactor: AddDocumentInteractor
   private let deepLinkController: DeepLinkController
@@ -59,8 +62,7 @@ final class AddDocumentViewModel<Router: RouterHost>: ViewModel<Router, AddDocum
       initialState: .init(
         addDocumentCellModels: AddDocumentUIModel.mocks,
         error: nil,
-        config: config,
-        showFooterScanner: config.isNoDocumentFlow
+        config: config
       )
     )
   }
@@ -85,8 +87,7 @@ final class AddDocumentViewModel<Router: RouterHost>: ViewModel<Router, AddDocum
     case .success(let documents):
       setState {
         $0.copy(
-          addDocumentCellModels: documents,
-          showFooterScanner: showScannerFooter(documents: documents)
+          addDocumentCellModels: documents
         )
         .copy(error: nil)
       }
@@ -127,9 +128,9 @@ final class AddDocumentViewModel<Router: RouterHost>: ViewModel<Router, AddDocum
     var successNavigation: UIConfig.TwoWayNavigationType {
       switch viewState.config.flow {
       case .noDocument:
-          .push(.featureDashboardModule(.dashboard))
+        .push(.featureDashboardModule(.dashboard))
       case .extraDocument:
-          .popTo(.featureDashboardModule(.dashboard))
+        .popTo(.featureDashboardModule(.dashboard))
       }
     }
 
@@ -156,21 +157,31 @@ final class AddDocumentViewModel<Router: RouterHost>: ViewModel<Router, AddDocum
   }
 
   func toolbarContent() -> ToolBarContent? {
+    let scanAction = scanToolbarAction()
     return switch viewState.config.flow {
     case .noDocument:
-      nil
+      .init(trailingActions: [scanAction])
     case .extraDocument:
-        .init(
-          trailingActions: [],
-          leadingActions: [
-            .init(
-              image: Theme.shared.image.chevronLeft,
-              accessibilityLocator: ToolbarLocators.chevronLeft
-            ) {
-              self.pop()
-            }
-          ]
-        )
+      .init(
+        trailingActions: [scanAction],
+        leadingActions: [
+          .init(
+            image: Theme.shared.image.chevronLeft,
+            accessibilityLocator: ToolbarLocators.chevronLeft
+          ) {
+            self.pop()
+          }
+        ]
+      )
+    }
+  }
+
+  private func scanToolbarAction() -> ToolBarContent.Action {
+    .init(
+      image: Theme.shared.image.qrCodeViewfinder,
+      accessibilityLocator: AddDocumentLocators.scanQrCode
+    ) {
+      self.onScanClick()
     }
   }
 
@@ -197,6 +208,14 @@ final class AddDocumentViewModel<Router: RouterHost>: ViewModel<Router, AddDocum
           addDocumentCellModels: transformCellLoadingState(with: false)
         )
       }
+    case .issuerNotTrusted:
+      setState {
+        $0.copy(
+          addDocumentCellModels: transformCellLoadingState(with: false)
+        )
+        .copy(error: nil)
+      }
+      isIssuerNotTrustedSheetShowing = true
     case .failure(let error):
       setState {
         $0.copy(
@@ -246,6 +265,14 @@ final class AddDocumentViewModel<Router: RouterHost>: ViewModel<Router, AddDocum
             )
           )
         )
+      case .issuerNotTrusted:
+        setState {
+          $0.copy(
+            addDocumentCellModels: transformCellLoadingState(with: false)
+          )
+          .copy(error: nil)
+        }
+        isIssuerNotTrustedSheetShowing = true
       case .failure(let error):
         setState {
           $0.copy(
@@ -390,9 +417,5 @@ final class AddDocumentViewModel<Router: RouterHost>: ViewModel<Router, AddDocum
         )
       }
     }
-  }
-
-  private func showScannerFooter(documents: OrderedDictionary<String, [AddDocumentUIModel]>) -> Bool {
-    viewState.config.flow == .noDocument || documents.isEmpty
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -15,6 +15,7 @@
  */
 import SwiftUI
 import logic_resources
+import Combine
 
 public struct ContentScreenView<Content: View>: View {
 
@@ -28,7 +29,12 @@ public struct ContentScreenView<Content: View>: View {
   private let navigationTitle: LocalizableStringKey?
   private let isLoading: Bool
   private let toolbarContent: ToolBarContent?
-  private let notificationAction: NotificationAction?
+  private let toolbarColorScheme: ColorScheme?
+  private let notificationActions: [NotificationAction]
+
+  private var resolvedToolbarColorScheme: ColorScheme? {
+    toolbarColorScheme ?? Theme.shared.color.navigationBarColorScheme
+  }
 
   public init(
     padding: CGFloat = Theme.shared.dimension.padding,
@@ -40,7 +46,8 @@ public struct ContentScreenView<Content: View>: View {
     navigationTitle: LocalizableStringKey? = nil,
     isLoading: Bool = false,
     toolbarContent: ToolBarContent? = nil,
-    notificationAction: NotificationAction? = nil,
+    toolbarColorScheme: ColorScheme? = nil,
+    notificationActions: [NotificationAction] = [],
     @ViewBuilder content: () -> Content
   ) {
     self.content = content()
@@ -53,7 +60,8 @@ public struct ContentScreenView<Content: View>: View {
     self.navigationTitle = navigationTitle
     self.isLoading = isLoading
     self.toolbarContent = toolbarContent
-    self.notificationAction = notificationAction
+    self.toolbarColorScheme = toolbarColorScheme
+    self.notificationActions = notificationActions
   }
 
   public var body: some View {
@@ -75,6 +83,7 @@ public struct ContentScreenView<Content: View>: View {
       $0.navigationTitle(navigationTitle!)
     }
     .navigationBarTitleDisplayMode(.inline)
+    .toolbarColorScheme(resolvedToolbarColorScheme, for: .navigationBar)
     .if(toolbarContent != nil) {
       $0.toolbar {
         toolbarContent
@@ -86,9 +95,19 @@ public struct ContentScreenView<Content: View>: View {
     .if(allowBackGesture == false) {
       $0.navigationBarBackButtonHidden()
     }
-    .if(notificationAction != nil) {
-      $0.onReceive(NotificationCenter.default.publisher(for: notificationAction!.name)) { data in
-        notificationAction!.callback(data.userInfo)
+    .if(!notificationActions.isEmpty) { view in
+
+      let publishers = notificationActions.map {
+        NotificationCenter.default.publisher(for: $0.name)
+      }
+
+      let mergedPublisher = Publishers.MergeMany(publishers)
+
+      return view.onReceive(mergedPublisher) { notification in
+        let action = notificationActions.first { notificationAction in
+          notificationAction.name == notification.name
+        }
+        action?.callback(notification.userInfo)
       }
     }
     .fastenDynamicType()

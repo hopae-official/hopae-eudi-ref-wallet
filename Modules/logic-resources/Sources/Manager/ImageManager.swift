@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -18,6 +18,7 @@ import SwiftUI
 public protocol ImageManagerProtocol: Sendable {
   var logo: Image { get }
   var faceId: Image { get }
+  var faceIdMenu: Image { get }
   var id: Image { get }
   var ble: Image { get }
   var touchId: Image { get }
@@ -28,7 +29,10 @@ public protocol ImageManagerProtocol: Sendable {
   var chevronLeft: Image { get }
   var xmark: Image { get }
   var exclamationmarkCircle: Image { get }
+  var exclamationmarkTriangleFill: Image { get }
   var circle: Image { get }
+  var radioButtonSelected: Image { get }
+  var radioButtonUnselected: Image { get }
   var eye: Image { get }
   var eyeSlash: Image { get }
   var checkmarkCircleFill: Image { get }
@@ -45,7 +49,6 @@ public protocol ImageManagerProtocol: Sendable {
   var clockIndicator: Image { get }
   var errorIndicator: Image { get }
   var signDocument: Image { get }
-  var euditext: Image { get }
   var walletVerified: Image { get }
   var bell: Image { get }
   var menuIcon: Image { get }
@@ -57,6 +60,7 @@ public protocol ImageManagerProtocol: Sendable {
   var hourglassImage: Image { get }
   var chooseDocumentImage: Image { get }
   var scanDocumentImage: Image { get }
+  var qrCodeViewfinder: Image { get }
   var infoCircle: Image { get }
   var relyingPartyVerified: Image { get }
   var docFill: Image { get }
@@ -68,12 +72,18 @@ public protocol ImageManagerProtocol: Sendable {
   var documentSuccessPending: Image { get }
   var verified: Image { get }
   var ellipsisVertical: Image { get }
+  var copy: Image { get }
+  var changePin: Image { get }
+  var batchCounter: Image { get }
+  var retrieveLogs: Image { get }
+  var changelog: Image { get }
 }
 
 final class ImageManager: ImageManagerProtocol {
 
   enum ImageEnum: String {
     case faceId = "face-id"
+    case faceIdMenu = "faceid"
     case id = "id"
     case ble = "ble"
     case touchId = "touch-id"
@@ -85,7 +95,10 @@ final class ImageManager: ImageManagerProtocol {
     case chevronLeft = "chevron.left"
     case xmark = "xmark"
     case exclamationmarkCircle = "exclamationmark.circle"
+    case exclamationmarkTriangleFill = "exclamationmark.triangle.fill"
     case circle = "circle.fill"
+    case radioButtonSelected = "largecircle.fill.circle"
+    case radioButtonUnselected = "circle"
     case eye = "eye"
     case eyeSlash = "eye.slash"
     case checkmarkCircleFill = "checkmark.circle.fill"
@@ -102,7 +115,6 @@ final class ImageManager: ImageManagerProtocol {
     case clockIndicator = "clock.fill"
     case errorIndicator = "exclamationmark.circle.fill"
     case signDocument = "doc"
-    case euditext = "EUDI-text"
     case walletVerified = "wallet-verified"
     case bell
     case menuIcon = "line.3.horizontal"
@@ -114,6 +126,7 @@ final class ImageManager: ImageManagerProtocol {
     case hourglassImage
     case chooseDocumentImage = "choose-document-image"
     case scanDocumentImage = "scan-document-image"
+    case qrCodeViewfinder = "qrcode.viewfinder"
     case infoCircle = "info.circle"
     case relyingPartyVerified = "relying-party-verified"
     case docFill = "doc.fill"
@@ -125,6 +138,11 @@ final class ImageManager: ImageManagerProtocol {
     case documentSuccessPending = "document-success-pending"
     case verified = "verified"
     case ellipsisVertical = "elipsis-vertical"
+    case copy = "doc.on.doc"
+    case changePin = "123.rectangle"
+    case batchCounter = "number"
+    case retrieveLogs = "arrow.up.forward.square"
+    case changelog = "clock.arrow.trianglehead.2.counterclockwise.rotate.90"
   }
 
   // MARK: - Properties
@@ -138,6 +156,9 @@ final class ImageManager: ImageManagerProtocol {
   // MARK: - Images
   var faceId: Image {
     Image(ImageEnum.faceId.rawValue, bundle: bundle)
+  }
+  var faceIdMenu: Image {
+    Image(systemName: ImageEnum.faceIdMenu.rawValue)
   }
   var id: Image {
     Image(ImageEnum.id.rawValue, bundle: bundle)
@@ -172,8 +193,17 @@ final class ImageManager: ImageManagerProtocol {
   var exclamationmarkCircle: Image {
     Image(systemName: ImageEnum.exclamationmarkCircle.rawValue)
   }
+  var exclamationmarkTriangleFill: Image {
+    Image(systemName: ImageEnum.exclamationmarkTriangleFill.rawValue)
+  }
   var circle: Image {
     Image(systemName: ImageEnum.circle.rawValue)
+  }
+  var radioButtonSelected: Image {
+    Image(systemName: ImageEnum.radioButtonSelected.rawValue)
+  }
+  var radioButtonUnselected: Image {
+    Image(systemName: ImageEnum.radioButtonUnselected.rawValue)
   }
   var eye: Image {
     Image(systemName: ImageEnum.eye.rawValue)
@@ -223,9 +253,6 @@ final class ImageManager: ImageManagerProtocol {
   var signDocument: Image {
     Image(systemName: ImageEnum.signDocument.rawValue)
   }
-  var euditext: Image {
-    Image(ImageEnum.euditext.rawValue, bundle: bundle)
-  }
   var walletVerified: Image {
     Image(ImageEnum.walletVerified.rawValue, bundle: bundle)
   }
@@ -259,6 +286,9 @@ final class ImageManager: ImageManagerProtocol {
   var scanDocumentImage: Image {
     Image(ImageEnum.scanDocumentImage.rawValue, bundle: bundle)
   }
+  var qrCodeViewfinder: Image {
+    Image(systemName: ImageEnum.qrCodeViewfinder.rawValue)
+  }
   var infoCircle: Image {
     Image(systemName: ImageEnum.infoCircle.rawValue)
   }
@@ -291,5 +321,20 @@ final class ImageManager: ImageManagerProtocol {
   }
   var ellipsisVertical: Image {
     Image(ImageEnum.ellipsisVertical.rawValue, bundle: bundle)
+  }
+  var copy: Image {
+    Image(systemName: ImageEnum.copy.rawValue)
+  }
+  var changePin: Image {
+    Image(systemName: ImageEnum.changePin.rawValue)
+  }
+  var batchCounter: Image {
+    Image(systemName: ImageEnum.batchCounter.rawValue)
+  }
+  var retrieveLogs: Image {
+    Image(systemName: ImageEnum.retrieveLogs.rawValue)
+  }
+  var changelog: Image {
+    Image(systemName: ImageEnum.changelog.rawValue)
   }
 }

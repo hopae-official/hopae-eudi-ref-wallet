@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -31,6 +31,8 @@ struct OfferCodeViewState: ViewState {
 
 @Observable
 final class OfferCodeViewModel<Router: RouterHost>: ViewModel<Router, OfferCodeViewState> {
+
+  var isIssuerNotTrustedSheetShowing: Bool = false
 
   var codeInput: String = "" {
     didSet {
@@ -68,8 +70,7 @@ final class OfferCodeViewModel<Router: RouterHost>: ViewModel<Router, OfferCodeV
         caption: .issuanceCodeCaption([config.txCodeLength.string]),
         contentHeaderConfig: .init(
           appIconAndTextData: AppIconAndTextData(
-            appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet,
-            appText: ThemeManager.shared.image.euditext
+            appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet
           )
         )
       )
@@ -91,6 +92,9 @@ final class OfferCodeViewModel<Router: RouterHost>: ViewModel<Router, OfferCodeV
     case .success(let route):
       router.push(with: route)
     case .noPending: break
+    case .issuerNotTrusted:
+      setState { $0.copy(isLoading: false).copy(error: nil) }
+      isIssuerNotTrustedSheetShowing = true
     case .failure(let error):
       setState {
         $0.copy(
@@ -165,6 +169,9 @@ final class OfferCodeViewModel<Router: RouterHost>: ViewModel<Router, OfferCodeV
             )
           )
         )
+      case .issuerNotTrusted:
+        setState { $0.copy(isLoading: false).copy(error: nil) }
+        isIssuerNotTrustedSheetShowing = true
       case .failure(let error):
         setState {
           $0.copy(

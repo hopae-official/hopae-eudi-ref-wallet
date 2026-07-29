@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -18,6 +18,7 @@ import UIKit
 import logic_resources
 import logic_business
 import feature_common
+import EudiWalletKit
 @testable import logic_core
 @testable import feature_proximity
 @testable import logic_test
@@ -302,16 +303,16 @@ final class TestProximityInteractor: EudiTest {
   func testOnRequestReceived_WhenCoordinatorRequestReceivedThrowsError_ThenVerifyFailureState() async {
     // Given
     let expectedError = PresentationSessionError.conversionToRequestItemModel
-    
+
     stub(presentationSessionCoordinator) { mock in
       when(mock.requestReceived()).thenThrow(expectedError)
     }
-    
+
     stubFetchRevokedDocuments(with: [])
-    
+
     // When
     let state = await interactor.onRequestReceived()
-    
+
     // Then
     switch state {
     case .failure(let error):
@@ -319,6 +320,27 @@ final class TestProximityInteractor: EudiTest {
         error.localizedDescription,
         expectedError.localizedDescription
       )
+    default:
+      XCTFail("Wrong state \(state)")
+    }
+  }
+
+  func testOnRequestReceived_WhenCoordinatorRequestReceivedThrowsTrustError_ThenVerifyNotSecuredRequest() async {
+    // Given
+    stub(presentationSessionCoordinator) { mock in
+      when(mock.requestReceived())
+        .thenThrow(WalletError(description: "reader not trusted", code: .trustError))
+    }
+
+    stubFetchRevokedDocuments(with: [])
+
+    // When
+    let state = await interactor.onRequestReceived()
+
+    // Then
+    switch state {
+    case .notSecuredRequest:
+      XCTAssertTrue(true)
     default:
       XCTFail("Wrong state \(state)")
     }
@@ -504,7 +526,7 @@ final class TestProximityInteractor: EudiTest {
   func testOnRequestReceived_WhenAllDocumentsAreRevoked_ThenVerifyFailureState() async {
     // Given
     let mockResponse = Self.mockPresentationRequest
-    let revokedDocIds = mockResponse.items.map { $0.docId }
+    let revokedDocIds = mockResponse.itemSets.flatMap { $0 }.map { $0.docId }
 
     stub(presentationSessionCoordinator) { mock in
       when(mock.requestReceived()).thenReturn(mockResponse)

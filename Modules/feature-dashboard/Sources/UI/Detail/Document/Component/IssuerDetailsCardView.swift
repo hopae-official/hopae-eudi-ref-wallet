@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -21,48 +21,56 @@ struct IssuerDetailsCardView: View {
 
   private let issuerDetails: IssuerDocumentDetailsCardUIModel
   private let onAction: (() -> Void)?
+  private let isLoading: Bool
 
   init(
     issuerDetails: IssuerDocumentDetailsCardUIModel,
+    isLoading: Bool = false,
     onAction: (() -> Void)? = nil
   ) {
     self.issuerDetails = issuerDetails
+    self.isLoading = isLoading
     self.onAction = onAction
   }
 
   var body: some View {
     ExpandableCardView(
+      backgroundColor: Theme.shared.color.groupedElevatedBackground,
       header: .init(
         mainContent: .text(issuerDetails.issuerName),
         supportingText: issuerDetails.dateText ?? .viewDetails,
         supportingTextColor: issuerDetails.dateTextColor,
-        leadingIcon: .init(
-          imageUrl: issuerDetails.issuerLogo,
+        leadingContent: .remoteImage(
+          url: issuerDetails.issuerLogo,
           image: Theme.shared.image.id
         )
-      )
+      ),
+      isLoading: self.isLoading
     ) {
       VStack(alignment: .leading, spacing: SPACING_MEDIUM) {
         if let dateTextKey = issuerDetails.expandedDateText {
           Text(dateTextKey)
             .typography(Theme.shared.font.bodyMedium)
-            .foregroundStyle(Theme.shared.color.onSurfaceVariant)
+            .foregroundStyle(Theme.shared.color.secondaryLabel)
         }
 
         HStack(alignment: .center, spacing: SPACING_SMALL) {
           Text(issuerDetails.expandedMessageText)
             .typography(Theme.shared.font.bodyMedium)
-            .foregroundStyle(Theme.shared.color.onSurfaceVariant)
+            .foregroundStyle(Theme.shared.color.secondaryLabel)
 
           Spacer()
 
           if let onAction, let textButton = issuerDetails.expandedActionButtonText {
-            Button(action: onAction) {
-              Text(textButton)
-                .typography(Theme.shared.font.bodyLarge)
-                .fontWeight(.medium)
-                .foregroundStyle(Theme.shared.color.primary)
-            }
+            Button(
+              action: onAction,
+              label: {
+                Text(textButton)
+                  .typography(Theme.shared.font.bodyLarge)
+                  .fontWeight(.medium)
+                  .foregroundStyle(Theme.shared.color.accent)
+              }
+            )
           }
         }
       }
