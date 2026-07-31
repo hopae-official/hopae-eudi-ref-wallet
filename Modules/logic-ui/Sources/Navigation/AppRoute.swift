@@ -18,14 +18,35 @@ import logic_business
 import logic_core
 import logic_resources
 
+public final class IntroUiConfig: UIConfigType, Equatable, @unchecked Sendable {
+  public let showDismissOption: Bool
+  public let nextRoute: AppRoute?
+
+  public var log: String {
+    "showDismissOption: \(showDismissOption)"
+  }
+
+  public init(showDismissOption: Bool, nextRoute: AppRoute? = nil) {
+    self.showDismissOption = showDismissOption
+    self.nextRoute = nextRoute
+  }
+
+  public static func == (lhs: IntroUiConfig, rhs: IntroUiConfig) -> Bool {
+    lhs.showDismissOption == rhs.showDismissOption
+  }
+}
+
 public enum FeatureStartupRouteModule: AppRouteModule {
 
   case startup
+  case intro(config: IntroUiConfig)
 
   public var info: (key: String, arguments: [String: String]) {
     return switch self {
     case .startup:
       (key: "Startup", arguments: [:])
+    case .intro(let config):
+      (key: "Intro", arguments: ["config": config.log])
     }
   }
 }

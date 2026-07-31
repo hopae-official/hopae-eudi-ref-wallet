@@ -396,6 +396,8 @@ final class LocalizableManager: LocalizableManagerType {
       bundle.localizedString(forKey: "category_travel")
     case .changelog:
       bundle.localizedString(forKey: "changelog")
+    case .sourceRepository:
+      bundle.localizedString(forKey: "sourceRepository")
     case .orderBy:
       bundle.localizedString(forKey: "order_by")
     case .filterByCategory:
@@ -536,6 +538,34 @@ final class LocalizableManager: LocalizableManagerType {
       bundle.localizedString(forKey: "enter_your_pin")
     case .homeScreenAuthenticateDescription:
       bundle.localizedString(forKey: "home_screen_authenticate_description")
+    case .aboutThisApp:
+      bundle.localizedString(forKey: "about_this_app")
+    case .introWhatIsThisApp:
+      bundle.localizedString(forKey: "intro_what_is_this_app")
+    case .introWhatIsThisAppBody:
+      bundle.localizedString(forKey: "intro_what_is_this_app_body")
+    case .introCurrentVersion(let args):
+      bundle.localizedStringWithArguments(forKey: "intro_current_version", arguments: args)
+    case .introMinimalModifications:
+      bundle.localizedString(forKey: "intro_minimal_modifications")
+    case .introMinimalModificationsBody:
+      bundle.localizedString(forKey: "intro_minimal_modifications_body")
+    case .introPrivacy:
+      bundle.localizedString(forKey: "intro_privacy")
+    case .introPrivacyBody:
+      bundle.localizedString(forKey: "intro_privacy_body")
+    case .introOpenSource:
+      bundle.localizedString(forKey: "intro_open_source")
+    case .introOpenSourceBody:
+      bundle.localizedString(forKey: "intro_open_source_body")
+    case .introDisclaimer:
+      bundle.localizedString(forKey: "intro_disclaimer")
+    case .introDisclaimerBody:
+      bundle.localizedString(forKey: "intro_disclaimer_body")
+    case .introDontShowAgain:
+      bundle.localizedString(forKey: "intro_dont_show_again")
+    case .introContinue:
+      bundle.localizedString(forKey: "intro_continue")
     }
   }
 }

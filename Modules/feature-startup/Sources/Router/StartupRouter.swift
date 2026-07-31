@@ -31,6 +31,14 @@ public final class StartupRouter {
           )
         )
       )
+    case .intro(let config):
+      IntroView(
+        with: .init(
+          router: host,
+          interactor: DIGraph.shared.resolver.force(IntroInteractor.self),
+          config: config
+        )
+      )
     }
   }
 }

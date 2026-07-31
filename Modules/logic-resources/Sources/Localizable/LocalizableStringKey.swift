@@ -200,6 +200,7 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case categorySocialSecurity
   case categoryTravel
   case changelog
+  case sourceRepository
   case orderBy
   case filterByCategory
   case searchDocuments
@@ -242,6 +243,20 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case transactionDetailsReportTransactionMessage
   case transactionDetailsReportTransactionButton
   case settings
+  case aboutThisApp
+  case introWhatIsThisApp
+  case introWhatIsThisAppBody
+  case introCurrentVersion([String])
+  case introMinimalModifications
+  case introMinimalModificationsBody
+  case introPrivacy
+  case introPrivacyBody
+  case introOpenSource
+  case introOpenSourceBody
+  case introDisclaimer
+  case introDisclaimerBody
+  case introDontShowAgain
+  case introContinue
   case documentDetailsDocumentCredentialsText([String])
   case documentDetailsDocumentCredentialsExpandedTextSubtitle
   case documentsListCredentialsUsageText([String])

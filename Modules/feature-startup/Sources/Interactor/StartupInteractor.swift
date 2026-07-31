@@ -29,19 +29,22 @@ final actor StartupInteractorImpl: StartupInteractor {
   private let keyChainController: KeyChainController
   private let prefsController: PrefsController
   private let configLogic: ConfigLogic
+  private let introInteractor: IntroInteractor
 
   init(
     walletKitController: WalletKitController,
     quickPinInteractor: QuickPinInteractor,
     keyChainController: KeyChainController,
     prefsController: PrefsController,
-    configLogic: ConfigLogic
+    configLogic: ConfigLogic,
+    introInteractor: IntroInteractor
   ) {
     self.walletKitController = walletKitController
     self.quickPinInteractor = quickPinInteractor
     self.keyChainController = keyChainController
     self.prefsController = prefsController
     self.configLogic = configLogic
+    self.introInteractor = introInteractor
   }
 
   public func initialize(with splashAnimationDuration: TimeInterval) async -> AppRoute {
@@ -49,6 +52,24 @@ final actor StartupInteractorImpl: StartupInteractor {
     try? await walletKitController.loadDocuments()
     let hasDocuments = await !walletKitController.fetchAllDocuments().isEmpty
     try? await Task.sleep(nanoseconds: splashAnimationDuration.nanoseconds)
+
+    let authRoute = await buildAuthRoute(hasDocuments: hasDocuments)
+
+    if await introInteractor.shouldShowIntro() {
+      return .featureStartupModule(
+        .intro(
+          config: IntroUiConfig(
+            showDismissOption: true,
+            nextRoute: authRoute
+          )
+        )
+      )
+    }
+
+    return authRoute
+  }
+
+  private func buildAuthRoute(hasDocuments: Bool) async -> AppRoute {
     if await quickPinInteractor.hasPin() {
       return .featureCommonModule(
         .biometry(

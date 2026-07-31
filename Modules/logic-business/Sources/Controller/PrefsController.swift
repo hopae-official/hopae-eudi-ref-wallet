@@ -95,6 +95,7 @@ public extension Prefs {
     case cachedDeepLink
     case runAtLeastOnce
     case language
+    case introLastDismissedVersion
     case batchCounter
   }
 }

@@ -168,11 +168,38 @@ final class SettingsViewModel<Router: RouterHost>: ViewModel<Router, SettingsVie
         .init(
           title: .changelog,
           icon: Theme.shared.image.changelog,
-          showDivider: false,
           action: { changelogUrl.open() }
         )
       )
     }
+
+    if let sourceRepoUrl = URL(string: "https://github.com/hopae-official/hopae-eudi-ref-wallet") {
+      items.append(
+        .init(
+          title: .sourceRepository,
+          action: { sourceRepoUrl.open() }
+        )
+      )
+    }
+
+    items.append(
+      .init(
+        title: .aboutThisApp,
+        showDivider: false,
+        action: { [weak self] in
+          guard let self else { return }
+          self.router.push(
+            with: .featureStartupModule(
+              .intro(
+                config: IntroUiConfig(
+                  showDismissOption: false
+                )
+              )
+            )
+          )
+        }
+      )
+    )
 
     setState {
       $0.copy(

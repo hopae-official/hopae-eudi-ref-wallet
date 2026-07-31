@@ -70,6 +70,14 @@ struct HomeTabView<Router: RouterHost>: View {
         Text(.bleDisabledModalCaption)
       }
     )
+    .alert(
+      "No Documents Available",
+      isPresented: $viewModel.isNoDocumentAlertShowing
+    ) {
+      Button("OK", role: .cancel) {}
+    } message: {
+      Text("Please add a document to your wallet before sharing in person.")
+    }
     .onChange(of: scenePhase) {
       self.viewModel.setPhase(with: scenePhase)
     }
