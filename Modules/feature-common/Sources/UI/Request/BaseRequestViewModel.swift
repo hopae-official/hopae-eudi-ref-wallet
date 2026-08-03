@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -25,6 +25,8 @@ public struct RequestViewState: ViewState {
   public let errorTitle: LocalizableStringKey?
   public let showMissingCredentials: Bool
   public let items: [RequestDataUiModel]
+  public let combinations: [[RequestDataUiModel]]
+  public let selectedCombinationIndex: Int
   public let trustedRelyingPartyInfo: LocalizableStringKey
   public let relyingParty: LocalizableStringKey
   public let isTrusted: Bool
@@ -50,6 +52,8 @@ open class BaseRequestViewModel<Router: RouterHost>: ViewModel<Router, RequestVi
         errorTitle: nil,
         showMissingCredentials: true,
         items: RequestDataUiModel.mockData(),
+        combinations: [],
+        selectedCombinationIndex: 0,
         trustedRelyingPartyInfo: .requestDataVerifiedEntityMessage,
         relyingParty: .unknownVerifier,
         isTrusted: false,
@@ -58,8 +62,7 @@ open class BaseRequestViewModel<Router: RouterHost>: ViewModel<Router, RequestVi
         initialized: false,
         contentHeaderConfig: .init(
           appIconAndTextData: AppIconAndTextData(
-            appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet,
-            appText: ThemeManager.shared.image.euditext
+            appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet
           ),
           description: .dataSharingTitle
         )
@@ -154,16 +157,46 @@ open class BaseRequestViewModel<Router: RouterHost>: ViewModel<Router, RequestVi
     relyingParty: LocalizableStringKey,
     isTrusted: Bool
   ) {
+    onReceivedCombinations(
+      with: [items],
+      title: title,
+      relyingParty: relyingParty,
+      isTrusted: isTrusted
+    )
+  }
+
+  public func onReceivedCombinations(
+    with combinations: [[RequestDataUiModel]],
+    title: LocalizableStringKey,
+    relyingParty: LocalizableStringKey,
+    isTrusted: Bool
+  ) {
+    let selectedItems = combinations.first ?? []
     setState {
       $0.copy(
         isLoading: false,
-        items: items,
+        items: selectedItems,
+        combinations: combinations,
+        selectedCombinationIndex: 0,
         relyingParty: relyingParty,
         isTrusted: isTrusted,
-        allowShare: canShare(with: items),
+        allowShare: canShare(with: selectedItems),
         initialized: true
       )
       .copy(error: nil)
+    }
+  }
+
+  func onCombinationSelected(index: Int) {
+    guard viewState.combinations.indices.contains(index) else { return }
+    let selectedItems = viewState.combinations[index]
+    setState {
+      $0.copy(
+        showMissingCredentials: false,
+        items: selectedItems,
+        selectedCombinationIndex: index,
+        allowShare: canShare(with: selectedItems)
+      )
     }
   }
 
@@ -175,6 +208,8 @@ open class BaseRequestViewModel<Router: RouterHost>: ViewModel<Router, RequestVi
         errorTitle: nil,
         showMissingCredentials: true,
         items: RequestDataUiModel.mockData(),
+        combinations: [],
+        selectedCombinationIndex: 0,
         trustedRelyingPartyInfo: .requestDataVerifiedEntityMessage,
         relyingParty: .unknownVerifier,
         isTrusted: false,
@@ -188,15 +223,6 @@ open class BaseRequestViewModel<Router: RouterHost>: ViewModel<Router, RequestVi
 
   func toolbarContent() -> ToolBarContent {
     .init(
-      trailingActions: [
-        .init(
-          title: .shareButton,
-          accessibilityLocator: BaseRequestLocators.shareButton,
-          disabled: !viewState.allowShare
-        ) {
-          self.onShare()
-        }
-      ],
       leadingActions: [
         .init(
           image: Theme.shared.image.chevronLeft,
@@ -226,7 +252,15 @@ open class BaseRequestViewModel<Router: RouterHost>: ViewModel<Router, RequestVi
   }
 
   func onSelectionChanged(id: String) async {
-    if viewState.showMissingCredentials {
+    await onCombinationItemClick(combinationIndex: viewState.selectedCombinationIndex, id: id)
+  }
+
+  /// Handles a row tap (expand/collapse or checkbox toggle) within a specific combination.
+  /// Edits that combination's data and, when it is the selected one, keeps `items` in sync.
+  func onCombinationItemClick(combinationIndex: Int, id: String) async {
+    guard viewState.combinations.indices.contains(combinationIndex) else { return }
+
+    if viewState.combinations[combinationIndex].hasSelectableClaims() && viewState.showMissingCredentials {
       itemsChanged = true
       setState {
         $0.copy(
@@ -234,17 +268,23 @@ open class BaseRequestViewModel<Router: RouterHost>: ViewModel<Router, RequestVi
         )
       }
     } else {
-      let items = viewState.items.map { item in
+      let updatedItems = viewState.combinations[combinationIndex].map { item in
         var updatedItem = item
         updatedItem.toggleSelection(id: id)
         return updatedItem
       }
 
+      var combinations = viewState.combinations
+      combinations[combinationIndex] = updatedItems
+
+      let isSelectedCombination = combinationIndex == viewState.selectedCombinationIndex
+
       setState {
         $0.copy(
           showMissingCredentials: false,
-          items: items,
-          allowShare: canShare(with: items)
+          items: isSelectedCombination ? updatedItems : $0.items,
+          combinations: combinations,
+          allowShare: isSelectedCombination ? canShare(with: updatedItems) : $0.allowShare
         )
       }
     }
@@ -253,8 +293,7 @@ open class BaseRequestViewModel<Router: RouterHost>: ViewModel<Router, RequestVi
   private func initialHeaderConfig() -> ContentHeaderConfig {
     .init(
       appIconAndTextData: AppIconAndTextData(
-        appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet,
-        appText: ThemeManager.shared.image.euditext
+        appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet
       ),
       description: .dataSharingTitle
     )

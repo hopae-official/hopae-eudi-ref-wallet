@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -21,8 +21,10 @@ public final class LogicBusinessAssembly: Assembly {
 
   public func assemble(container: Container) {
 
-    container.register(KeyChainController.self) { _ in
-      KeyChainControllerImpl()
+    container.register(KeyChainController.self) { r in
+      KeyChainControllerImpl(
+        configLogic: r.force(ConfigLogic.self)
+      )
     }
     .inObjectScope(ObjectScope.container)
 

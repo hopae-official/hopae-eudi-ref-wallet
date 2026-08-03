@@ -26,12 +26,14 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>15</string>
 	<key>Changelog Url</key>
 	<string>$(CHANGELOG_URL)</string>
 	<key>Core User Auth</key>
 	<string>$(CORE_USER_AUTH)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>Team ID</key>
+	<string>$(APP_TEAM_ID)</string>
 </dict>
 </plist>

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -30,7 +30,7 @@ final class RouterHostImpl: RouterHost {
   @ObservationIgnored
   private let analyticsController: AnalyticsController
   @ObservationIgnored
-  private let lockInterval: Int = 1000
+  private let lockInterval: Int = 500
   @ObservationIgnored
   private var queueNavigation: [QueueItem] = []
   @ObservationIgnored
@@ -104,7 +104,7 @@ final class RouterHostImpl: RouterHost {
 
   public func getToolbarConfig() -> UIConfig.ToolBar {
     guard let screenKey = self.getCurrentScreen()?.info.key else {
-      return .init(Theme.shared.color.onSurface)
+      return .init(Theme.shared.color.primaryLabel)
     }
 
     return uiConfigLogic.backgroundColorForScreenDictionary[screenKey]
@@ -189,6 +189,8 @@ private extension RouterHostImpl {
       PresentationRouter.resolve(module: module, host: self)
     case .featureProximityModule(let module):
       ProximityRouter.resolve(module: module, host: self)
+    default:
+      EmptyView()
     }
   }
 }

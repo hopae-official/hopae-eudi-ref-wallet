@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -30,6 +30,7 @@ public protocol FilterValidator: Sendable {
   func updateFilter(filterGroupId: String, filterId: String) async
   func updateDateFilters(filterGroupId: String, filterId: String, startDate: Date, endDate: Date) async
   func updateSortOrder(sortOrder: SortOrderType) async
+  func updateSort(filterId: String) async
 }
 
 final actor FilterValidatorImpl: FilterValidator {
@@ -71,20 +72,35 @@ final actor FilterValidatorImpl: FilterValidator {
     filters: Filters,
     filterableList: FilterableList
   ) async {
+    let previousDefaultFilters = defaultFilters
     defaultFilters = filters
     var mergedFilterGroups: [FilterGroup] = []
 
     for newFilterGroup in filters.filterGroups {
       if let existingFilterGroup = appliedFilters.filterGroups.first(where: { $0.id == newFilterGroup.id }) {
-          mergedFilterGroups.append(mergeFilters(newFilterGroup: newFilterGroup, existingFilterGroup: existingFilterGroup))
+          mergedFilterGroups.append(
+            mergeFilters(
+              newFilterGroup: newFilterGroup,
+              existingFilterGroup: existingFilterGroup,
+              previousDefaultGroup: previousDefaultFilters.filterGroups.first(where: { $0.id == newFilterGroup.id })
+            )
+          )
       } else {
           mergedFilterGroups.append(newFilterGroup)
       }
     }
 
+    let mergedSort: FilterSort? = {
+      if appliedFilters.isEmpty {
+        return filters.sort
+      }
+      return mergeSort(newSort: filters.sort, existingSort: appliedFilters.sort)
+    }()
+
     appliedFilters = Filters(
       filterGroups: mergedFilterGroups,
-      sortOrder: defaultFilters.sortOrder
+      sortOrder: appliedFilters.isEmpty ? defaultFilters.sortOrder : appliedFilters.sortOrder,
+      sort: mergedSort
     )
 
     self.initialList = filterableList
@@ -112,7 +128,14 @@ final actor FilterValidatorImpl: FilterValidator {
       }
     }
 
-    hasDefaultFilters = checkIfDefaultFiltersApplied(groups: appliedFilters.filterGroups)
+    // Apply the active sort last so that the reduce above does not
+    // disturb its ordering.
+    filteredList = filteredList.applySort(filters: appliedFilters)
+
+    hasDefaultFilters = checkIfDefaultFiltersApplied(
+      groups: appliedFilters.filterGroups,
+      sort: appliedFilters.sort
+    )
 
     if !searchQuery.isEmpty {
       filteredList = filteredList.copy(
@@ -230,6 +253,29 @@ final actor FilterValidatorImpl: FilterValidator {
     )
   }
 
+  func updateSort(filterId: String) async {
+    let filtersToUpdate = snapshotFilters.isEmpty ? appliedFilters : snapshotFilters
+
+    guard let currentSort = filtersToUpdate.sort else {
+      return
+    }
+
+    let updatedSortFilters = currentSort.filters.map { filter in
+      filter.copy(selected: filter.id == filterId)
+    }
+    let updatedSort = currentSort.copy(filters: updatedSortFilters)
+
+    snapshotFilters = filtersToUpdate.copy(sort: updatedSort)
+
+    self.filterResultSubject.send(
+      .success(
+        .filterUpdateResult(
+          updatedFilters: snapshotFilters
+        )
+      )
+    )
+  }
+
   func updateLists(sortOrder: SortOrderType, filterableList: FilterableList) async {
     self.initialList = filterableList.sortedByOrder(sortOrder: sortOrder) {
       $0.attributes.sortingKey
@@ -253,6 +299,12 @@ final actor FilterValidatorImpl: FilterValidator {
       return .init(items: [])
     }
 
+    // Sorting is handled by `applySort` after the reduce above, so skip it
+    // here to avoid having it overwritten by subsequent filter groups.
+    if selectedFilter.filterableAction is SortFilterAction {
+      return currentList
+    }
+
     return selectedFilter.filterableAction.applyFilter(
       sortOrder: appliedFilters.sortOrder,
       filterableItems: currentList,
@@ -265,6 +317,10 @@ final actor FilterValidatorImpl: FilterValidator {
     _ group: ReversibleSingleSelectionFilterGroup
   ) -> FilterableList {
     guard let selectedFilter = group.filters.first(where: { $0.selected }) else {
+      return currentList
+    }
+
+    if selectedFilter.filterableAction is SortFilterAction {
       return currentList
     }
 
@@ -286,17 +342,24 @@ final actor FilterValidatorImpl: FilterValidator {
 
   private func mergeFilters(
     newFilterGroup: FilterGroup,
-    existingFilterGroup: FilterGroup
+    existingFilterGroup: FilterGroup,
+    previousDefaultGroup: FilterGroup?
   ) -> FilterGroup {
-    let mergedFilters = newFilterGroup.filters.map { newFilter in
-      if let existingFilter = existingFilterGroup.filters.first(where: { $0.id == newFilter.id }) {
-        return newFilter.copy(
-          selected: existingFilter.selected,
-          startDate: existingFilter.startDate,
-          endDate: existingFilter.endDate
-        )
+    let mergedFilters = newFilterGroup.filters.map { newFilter -> FilterItem in
+      guard let existingFilter = existingFilterGroup.filters.first(where: { $0.id == newFilter.id }) else {
+        return newFilter
       }
-      return newFilter
+
+      let previousDefaultFilter = previousDefaultGroup?.filters.first(where: { $0.id == newFilter.id })
+      let userCustomizedDates = previousDefaultFilter.map {
+        existingFilter.startDate != $0.startDate || existingFilter.endDate != $0.endDate
+      } ?? true
+
+      return newFilter.copy(
+        selected: existingFilter.selected,
+        startDate: userCustomizedDates ? existingFilter.startDate : newFilter.startDate,
+        endDate: userCustomizedDates ? existingFilter.endDate : newFilter.endDate
+      )
     }
 
     switch newFilterGroup {
@@ -363,14 +426,28 @@ final actor FilterValidatorImpl: FilterValidator {
     return group
   }
 
-  func checkIfDefaultFiltersApplied(groups: [FilterGroup]) -> Bool {
-    let allFilters = groups.flatMap { $0.filters }
+  func checkIfDefaultFiltersApplied(groups: [FilterGroup], sort: FilterSort?) -> Bool {
+    let allFilters: [FilterItem] = groups.flatMap { $0.filters } + (sort?.filters ?? [])
 
     let allSelectedAreDefault = allFilters.filter { $0.selected }.allSatisfy { $0.isDefault }
 
     let allUnselectedAreNotDefault = allFilters.filter { !$0.selected }.allSatisfy { !$0.isDefault }
 
     return allSelectedAreDefault && allUnselectedAreNotDefault
+  }
+
+  private func mergeSort(newSort: FilterSort?, existingSort: FilterSort?) -> FilterSort? {
+    guard let newSort else { return nil }
+    guard let existingSort else { return newSort }
+
+    let mergedFilters = newSort.filters.map { newFilter -> FilterItem in
+      if let existing = existingSort.filters.first(where: { $0.id == newFilter.id }) {
+        return newFilter.copy(selected: existing.selected)
+      }
+      return newFilter
+    }
+
+    return newSort.copy(filters: mergedFilters)
   }
 }
 

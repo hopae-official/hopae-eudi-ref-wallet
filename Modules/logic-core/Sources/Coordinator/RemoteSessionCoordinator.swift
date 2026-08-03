@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -70,7 +70,7 @@ final class RemoteSessionCoordinatorImpl: RemoteSessionCoordinator {
   }
 
   public func requestReceived() async throws -> PresentationRequest {
-    guard session.disclosedDocuments.isEmpty == false else {
+    guard session.disclosedDocumentSets.contains(where: { !$0.isEmpty }) else {
       throw session.uiError ?? .init(description: "Failed to Find known documents to send")
     }
     return createRequest()
@@ -101,7 +101,7 @@ final class RemoteSessionCoordinatorImpl: RemoteSessionCoordinator {
 
   private func createRequest() -> PresentationRequest {
     PresentationRequest(
-      items: session.disclosedDocuments,
+      itemSets: session.disclosedDocumentSets,
       relyingParty: session.readerCertIssuer ?? LocalizableStringKey.unknownVerifier.toString,
       dataRequestInfo: session.readerCertValidationMessage ?? LocalizableStringKey.requestDataInfoNotice.toString,
       isTrusted: session.readerCertIssuerValid == true

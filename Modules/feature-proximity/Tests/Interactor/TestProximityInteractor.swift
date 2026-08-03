@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -504,7 +504,7 @@ final class TestProximityInteractor: EudiTest {
   func testOnRequestReceived_WhenAllDocumentsAreRevoked_ThenVerifyFailureState() async {
     // Given
     let mockResponse = Self.mockPresentationRequest
-    let revokedDocIds = mockResponse.items.map { $0.docId }
+    let revokedDocIds = mockResponse.itemSets.flatMap { $0 }.map { $0.docId }
 
     stub(presentationSessionCoordinator) { mock in
       when(mock.requestReceived()).thenReturn(mockResponse)

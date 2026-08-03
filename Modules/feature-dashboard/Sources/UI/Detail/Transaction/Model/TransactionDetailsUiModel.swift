@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -52,6 +52,8 @@ extension TransactionLogItem {
           .issuance
       case .signing:
           .signing
+      case .deletion:
+          .deletion
       }
     }
 
@@ -59,7 +61,7 @@ extension TransactionLogItem {
       return switch transactionLogData {
       case .presentation(let log):
         log.status.mapToTransactionStatus()
-      case .issuance, .signing:
+      case .issuance, .signing, .deletion:
         nil
       }
     }
@@ -68,7 +70,7 @@ extension TransactionLogItem {
       return switch transactionLogData {
       case .presentation(let log):
         .custom(log.timestamp.formattedTimestamp().toString)
-      case .issuance, .signing:
+      case .issuance, .signing, .deletion:
         .custom("")
       }
     }
@@ -77,7 +79,7 @@ extension TransactionLogItem {
       return switch self.transactionLogData {
       case .presentation(let log):
         log.relyingParty
-      case .issuance, .signing:
+      case .issuance, .signing, .deletion:
         nil
       }
     }
@@ -86,7 +88,7 @@ extension TransactionLogItem {
       return switch self.transactionLogData {
       case .presentation(let log):
         log.documents.transformToTransactionListItemSections()
-      case .issuance, .signing:
+      case .issuance, .signing, .deletion:
         []
       }
     }
@@ -110,7 +112,7 @@ extension DocClaimsDecodable {
   func transformToTransactionListItemSection() -> GenericListItemSection {
     return .init(
       id: self.id,
-      title: self.displayName.ifNilOrEmpty { self.docType.orEmpty },
+      title: self.displayName.ifNilOrEmpty { self.docType },
       listItems: self.parseClaim(
         documentId: self.id,
         isSensitive: false,

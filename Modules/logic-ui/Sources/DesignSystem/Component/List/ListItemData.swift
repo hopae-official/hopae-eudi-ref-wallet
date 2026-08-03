@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -37,7 +37,7 @@ public struct ListItemData: Identifiable, Sendable, Equatable {
   public let supportingText: LocalizableStringKey?
   public let supportingTextColor: Color
   public let overlineTextColor: Color
-  public let leadingIcon: LeadingIcon?
+  public let leadingContent: LeadingContent?
   public let isBlur: Bool
   public let isEnable: Bool
   public let trailingContent: TrailingContent?
@@ -49,9 +49,9 @@ public struct ListItemData: Identifiable, Sendable, Equatable {
     mainStyle: MainStyle = .plain,
     overlineText: LocalizableStringKey? = nil,
     supportingText: LocalizableStringKey? = nil,
-    supportingTextColor: Color = Theme.shared.color.onSurfaceVariant,
-    overlineTextColor: Color = Theme.shared.color.onSurfaceVariant,
-    leadingIcon: LeadingIcon? = nil,
+    supportingTextColor: Color = Theme.shared.color.secondaryLabel,
+    overlineTextColor: Color = Theme.shared.color.secondaryLabel,
+    leadingContent: LeadingContent? = nil,
     isBlur: Bool = false,
     isEnable: Bool = true,
     trailingContent: TrailingContent? = nil
@@ -64,23 +64,26 @@ public struct ListItemData: Identifiable, Sendable, Equatable {
     self.supportingText = supportingText
     self.supportingTextColor = supportingTextColor
     self.overlineTextColor = overlineTextColor
-    self.leadingIcon = leadingIcon
+    self.leadingContent = leadingContent
     self.trailingContent = trailingContent
     self.isBlur = isBlur
     self.isEnable = isEnable
   }
 }
 
-public struct LeadingIcon: Sendable, Equatable {
-  public let imageUrl: URL?
-  public let image: Image?
+public enum LeadingContent: Sendable, Equatable {
+  case remoteImage(url: URL? = nil, image: Image? = nil)
+  case radioButton(isSelected: Bool)
 
-  public init(
-    imageUrl: URL? = nil,
-    image: Image? = nil
-  ) {
-    self.imageUrl = imageUrl
-    self.image = image
+  public static func == (lhs: LeadingContent, rhs: LeadingContent) -> Bool {
+    switch (lhs, rhs) {
+    case let (.remoteImage(lUrl, lImage), .remoteImage(rUrl, rImage)):
+      return lUrl == rUrl && lImage == rImage
+    case let (.radioButton(lIsSelected), .radioButton(rIsSelected)):
+      return lIsSelected == rIsSelected
+    default:
+      return false
+    }
   }
 }
 
@@ -110,8 +113,8 @@ public enum MainContent: Sendable, Equatable {
 }
 
 public enum TrailingContent: Sendable, Equatable {
-  case textWithIcon(Image, Color = Color.accentColor, LocalizableStringKey = .custom(""))
-  case icon(Image, Color = Color.accentColor)
+  case textWithIcon(Image, Color = Theme.shared.color.accent, LocalizableStringKey = .custom(""))
+  case icon(Image, Color = Theme.shared.color.accent)
   case checkbox(Bool, Bool, @Sendable (Bool) -> Void)
   case empty
 
@@ -180,12 +183,12 @@ public enum ExpandableListItem<T: Sendable>: Identifiable, Equatable, Sendable {
     }
   }
 
-  public var leadingIcon: LeadingIcon? {
+  public var leadingContent: LeadingContent? {
     return switch self {
     case .single(let data):
-      data.collapsed.leadingIcon
+      data.collapsed.leadingContent
     case .nested(let data):
-      data.collapsed.leadingIcon
+      data.collapsed.leadingContent
     }
   }
 

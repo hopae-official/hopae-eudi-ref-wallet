@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 European Commission
+ * Copyright (c) 2026 European Commission
  *
  * Licensed under the EUPL, Version 1.2 or - as soon they will be approved by the European
  * Commission - subsequent versions of the EUPL (the "Licence"); You may not use this work
@@ -311,7 +311,7 @@ final class TestPresentationInteractor: EudiTest {
     // Then
     switch state {
     case .success(let successModel):
-      XCTAssertEqual(successModel.requestDataCells, expectedUiModels)
+      XCTAssertEqual(successModel.requestDataCombinations, [expectedUiModels])
       XCTAssertEqual(successModel.relyingParty, request.relyingParty)
       XCTAssertEqual(successModel.dataRequestInfo, request.dataRequestInfo)
       XCTAssertEqual(successModel.isTrusted, request.isTrusted)
@@ -517,7 +517,7 @@ final class TestPresentationInteractor: EudiTest {
   func testOnRequestReceived_WhenAllDocumentsRevoked_ThenReturnsFailure() async {
     // Given
     let mockResponse = Self.mockPresentationRequest
-    let allDocIds = mockResponse.items.map { $0.docId }
+    let allDocIds = mockResponse.itemSets.flatMap { $0 }.map { $0.docId }
 
     stub(presentationCoordinator) { mock in
       when(mock.requestReceived()).thenReturn(mockResponse)
@@ -627,11 +627,7 @@ private extension TestPresentationInteractor {
                   mainContent: .text(.custom("value")),
                   overlineText: .custom("elementIdentifier"),
                   isEnable: true,
-                  trailingContent: .checkbox(
-                    true,
-                    true,
-                    { _ in }
-                  )
+                  trailingContent: .empty
                 ),
                 domainModel: claim
               )
