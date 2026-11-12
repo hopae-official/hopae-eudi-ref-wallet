@@ -83,7 +83,9 @@ struct ConfigUiLogicImpl: ConfigUiLogic {
     AppRoute.featureStartupModule(.startup).info.key,
     AppRoute.featureCommonModule(.biometry(config: NoConfig())).info.key,
     AppRoute.featureCommonModule(.quickPin(config: NoConfig())).info.key,
-    AppRoute.featureCommonModule(.trustMark(config: NoConfig())).info.key
+    AppRoute.featureCommonModule(.trustMark(config: NoConfig())).info.key,
+    // Hopae fork: the intro screen is shown before login, in place of the Trust Mark welcome screen.
+    AppRoute.featureStartupModule(.intro(config: IntroUiConfig(showDismissOption: false))).info.key
   ]
 
   /// The presentation and proximity routes carry a session coordinator, so their keys are written out;
