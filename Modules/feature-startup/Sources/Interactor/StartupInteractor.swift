@@ -53,6 +53,8 @@ final actor StartupInteractorImpl: StartupInteractor {
     let hasDocuments = await !walletKitController.fetchAllDocuments().isEmpty
     try? await Task.sleep(nanoseconds: splashAnimationDuration.nanoseconds)
 
+    // Hopae fork: the upstream Trust Mark welcome screen is intentionally skipped.
+    // It states that the wallet is certified, which does not apply to this build.
     let authRoute = await buildAuthRoute(hasDocuments: hasDocuments)
 
     if await introInteractor.shouldShowIntro() {
@@ -104,9 +106,11 @@ final actor StartupInteractorImpl: StartupInteractor {
   }
 
   private func manageStorageForFirstRun() async {
-    if !prefsController.getBool(forKey: .runAtLeastOnce) {
-      await walletKitController.clearAllDocuments()
-      keyChainController.clear()
+    guard !prefsController.getBool(forKey: .runAtLeastOnce) else { return }
+    try? await walletKitController.clearAllDocuments()
+
+    let didWipeStorage = keyChainController.clear()
+    if didWipeStorage {
       prefsController.setValue(true, forKey: .runAtLeastOnce)
     }
   }

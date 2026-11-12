@@ -16,6 +16,7 @@
 
 @_exported import logic_ui
 @_exported import logic_resources
+import logic_core
 import Observation
 
 @Copyable
@@ -27,21 +28,21 @@ public struct RequestViewState: ViewState {
   public let items: [RequestDataUiModel]
   public let combinations: [[RequestDataUiModel]]
   public let selectedCombinationIndex: Int
-  public let trustedRelyingPartyInfo: LocalizableStringKey
   public let relyingParty: LocalizableStringKey
   public let isTrusted: Bool
   public let allowShare: Bool
   public let originator: AppRoute
   public let initialized: Bool
-  public let contentHeaderConfig: ContentHeaderConfig
+  public let relyingPartyRegistration: RelyingPartyRegistrationData?
+  public let registrationWarning: RegistrationWarning?
 }
 
 @Observable
 open class BaseRequestViewModel<Router: RouterHost>: ViewModel<Router, RequestViewState> {
 
-  var isRequestInfoModalShowing: Bool = false
-  var isVerifiedEntityModalShowing: Bool = false
+  var isTrustBlockedAlertShowing: Bool = false
   var itemsChanged: Bool = false
+  var isRiskAcknowledged: Bool = false
 
   public init(router: Router, originator: AppRoute) {
     super.init(
@@ -54,58 +55,29 @@ open class BaseRequestViewModel<Router: RouterHost>: ViewModel<Router, RequestVi
         items: RequestDataUiModel.mockData(),
         combinations: [],
         selectedCombinationIndex: 0,
-        trustedRelyingPartyInfo: .requestDataVerifiedEntityMessage,
         relyingParty: .unknownVerifier,
         isTrusted: false,
         allowShare: false,
         originator: originator,
         initialized: false,
-        contentHeaderConfig: .init(
-          appIconAndTextData: AppIconAndTextData(
-            appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet
-          ),
-          description: .dataSharingTitle
-        )
+        relyingPartyRegistration: nil,
+        registrationWarning: nil
       )
     )
   }
 
   open func doWork() async {}
 
-  open func getTitle() -> LocalizableStringKey {
-    return .custom("")
-  }
-
   open func getRelyingParty() -> LocalizableStringKey {
     return .custom("")
   }
 
   open func getRelyingPartyIsTrusted() -> Bool {
-    return false
-  }
-
-  open func getCaption() -> LocalizableStringKey {
-    return .custom("")
-  }
-
-  open func getDataRequestInfo() -> LocalizableStringKey {
-    return .custom("")
+    return viewState.isTrusted
   }
 
   open func getSuccessRoute() -> AppRoute? {
     return nil
-  }
-
-  open func getTitleCaption() -> LocalizableStringKey {
-    return .custom("")
-  }
-
-  open func getTrustedRelyingParty() -> LocalizableStringKey {
-    return .custom("")
-  }
-
-  open func getTrustedRelyingPartyInfo() -> LocalizableStringKey {
-    return .custom("")
   }
 
   open func onShare() {
@@ -201,6 +173,7 @@ open class BaseRequestViewModel<Router: RouterHost>: ViewModel<Router, RequestVi
   }
 
   public func resetState() {
+    isRiskAcknowledged = false
     setState { previous in
       .init(
         isLoading: true,
@@ -210,14 +183,26 @@ open class BaseRequestViewModel<Router: RouterHost>: ViewModel<Router, RequestVi
         items: RequestDataUiModel.mockData(),
         combinations: [],
         selectedCombinationIndex: 0,
-        trustedRelyingPartyInfo: .requestDataVerifiedEntityMessage,
         relyingParty: .unknownVerifier,
         isTrusted: false,
         allowShare: false,
         originator: previous.originator,
         initialized: false,
-        contentHeaderConfig: initialHeaderConfig()
+        relyingPartyRegistration: nil,
+        registrationWarning: nil
       )
+    }
+  }
+
+  public func onReceivedRegistration(_ registration: RelyingPartyRegistration) {
+    isRiskAcknowledged = false
+    let resolvedName = registration.name.map { LocalizableStringKey.custom($0) }
+    setState {
+      $0
+        .copy(relyingParty: resolvedName ?? $0.relyingParty)
+        .copy(isTrusted: registration.isFullyVerified)
+        .copy(relyingPartyRegistration: registration.toRegistrationData(fallbackName: .unknownVerifier))
+        .copy(registrationWarning: registration.toWarning())
     }
   }
 
@@ -228,6 +213,7 @@ open class BaseRequestViewModel<Router: RouterHost>: ViewModel<Router, RequestVi
           image: Theme.shared.image.chevronLeft,
           accessibilityLocator: ToolbarLocators.chevronLeft
         ) {
+          Task { await self.declineRequest() }
           self.onPop()
         }
       ]
@@ -235,7 +221,6 @@ open class BaseRequestViewModel<Router: RouterHost>: ViewModel<Router, RequestVi
   }
 
   func onPop() {
-    isRequestInfoModalShowing = false
     if let route = getPopRoute() {
       router.popTo(with: route)
     } else {
@@ -243,20 +228,32 @@ open class BaseRequestViewModel<Router: RouterHost>: ViewModel<Router, RequestVi
     }
   }
 
-  func onShowRequestInfoModal() {
-    isRequestInfoModalShowing = !isRequestInfoModalShowing
+  open func stopPresentation() async {}
+  open func declineRequest() async {}
+  public func onTrustBlocked() {
+    setState {
+      $0.copy(
+        isLoading: false,
+        showMissingCredentials: false,
+        items: [],
+        combinations: [],
+        allowShare: false,
+        initialized: true
+      ).copy(error: nil)
+    }
+    isTrustBlockedAlertShowing = true
+    Task { await stopPresentation() }
   }
 
-  func onVerifiedEntityModal() {
-    isVerifiedEntityModalShowing = !isVerifiedEntityModalShowing
+  func onTrustBlockedClose() {
+    isTrustBlockedAlertShowing = false
+    onPop()
   }
 
   func onSelectionChanged(id: String) async {
     await onCombinationItemClick(combinationIndex: viewState.selectedCombinationIndex, id: id)
   }
 
-  /// Handles a row tap (expand/collapse or checkbox toggle) within a specific combination.
-  /// Edits that combination's data and, when it is the selected one, keeps `items` in sync.
   func onCombinationItemClick(combinationIndex: Int, id: String) async {
     guard viewState.combinations.indices.contains(combinationIndex) else { return }
 
@@ -288,15 +285,6 @@ open class BaseRequestViewModel<Router: RouterHost>: ViewModel<Router, RequestVi
         )
       }
     }
-  }
-
-  private func initialHeaderConfig() -> ContentHeaderConfig {
-    .init(
-      appIconAndTextData: AppIconAndTextData(
-        appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet
-      ),
-      description: .dataSharingTitle
-    )
   }
 
   private func canShare(with items: [RequestDataUiModel]) -> Bool {

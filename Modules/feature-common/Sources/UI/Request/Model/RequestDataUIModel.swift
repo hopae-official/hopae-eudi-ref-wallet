@@ -28,6 +28,7 @@ public struct RequestDataUiModel: Identifiable, Equatable, Sendable, Routable {
   public var id: String
 
   public let section: PresentationListItemSection
+  public let transactionData: [PresentationListItemSection]
 
   public var log: String {
     "id: \(section.id), title: \(section.title)"
@@ -35,10 +36,12 @@ public struct RequestDataUiModel: Identifiable, Equatable, Sendable, Routable {
 
   public init(
     id: String = UUID().uuidString,
-    section: PresentationListItemSection
+    section: PresentationListItemSection,
+    transactionData: [PresentationListItemSection] = []
   ) {
     self.id = id
     self.section = section
+    self.transactionData = transactionData
   }
 }
 
@@ -184,13 +187,16 @@ public extension Array where Element == RequestDataUiModel {
       currentList.forEach {
         switch $0 {
         case .single(let item):
+          let row = PresentationExpandableListItem.single(
+            item.copy(collapsed: item.collapsed.copy(supportingText: nil))
+          )
           switch item.collapsed.trailingContent {
           case .checkbox(_, let isSelected, _):
             if isSelected {
-              newList.append($0)
+              newList.append(row)
             }
           default:
-            newList.append($0)
+            newList.append(row)
           }
         case .nested(let item):
           newList.append($0)
@@ -353,7 +359,9 @@ public extension Array where Element == DocElements {
   ///   (presentation, where selection happens at the combination level).
   func toUiModels(
     with walletKitController: WalletKitController,
-    claimsAreSelectable: Bool = true
+    claimsAreSelectable: Bool = true,
+    overaskedPaths: [String: Set<[String]>] = [:],
+    transactionData: [String: [PresentationTransactionData]] = [:]
   ) -> [RequestDataUiModel] {
     self.compactMap { element in
 
@@ -410,11 +418,154 @@ public extension Array where Element == DocElements {
         return nil
       }
 
+      let overaskedPathsForDocument = overaskedPaths[element.docId] ?? []
+
       return .init(
         section: .init(
           id: element.docId,
           title: title,
-          listItems: dataRows.toListItems(claimsAreSelectable: claimsAreSelectable)
+          listItems: dataRows.toListItems(
+            claimsAreSelectable: claimsAreSelectable,
+            overaskedPaths: overaskedPathsForDocument
+          )
+        ),
+        transactionData: (transactionData[element.docId] ?? []).map { $0.toListItemSection() }
+      )
+    }
+  }
+}
+
+private let transactionDataValueSeparator = " · "
+
+private extension PresentationTransactionData {
+  func toListItemSection() -> PresentationListItemSection {
+    switch content {
+    case .qesApproval(let qesApproval):
+      .init(
+        id: UUID().uuidString,
+        title: LocalizableStringKey.requestTransactionDataSignatureDetails.toString,
+        listItems: qesApproval.toListItems()
+      )
+    case .generic(let fields):
+      .init(
+        id: UUID().uuidString,
+        title: LocalizableStringKey.requestTransactionDataTitle.toString,
+        listItems: [.transactionDataRow(overline: .requestTransactionDataType, value: type)]
+        + fields.map { $0.toExpandableListItem() }
+      )
+    }
+  }
+}
+
+private extension QesApprovalTransactionData {
+  func toListItems() -> [PresentationExpandableListItem] {
+    var items: [PresentationExpandableListItem] = [
+      .transactionDataRow(overline: .requestTransactionDataTrustFramework, value: trustFramework),
+      .transactionDataRow(
+        overline: .requestTransactionDataType,
+        value: LocalizableStringKey.requestTransactionDataTypeQes.toString
+      )
+    ]
+
+    if !credentialIds.isEmpty {
+      items.append(
+        .transactionDataRow(
+          overline: .requestTransactionDataRequestedCredentials,
+          value: credentialIds.joined(separator: transactionDataValueSeparator)
+        )
+      )
+    }
+
+    if let signingCredentialId {
+      items.append(.transactionDataRow(overline: .requestTransactionDataSigningCredentialId, value: signingCredentialId))
+    }
+
+    if let numberOfSignatures {
+      items.append(
+        .transactionDataRow(overline: .requestTransactionDataNumberOfSignatures, value: String(numberOfSignatures))
+      )
+    }
+
+    documents.forEach { document in
+      items.append(contentsOf: document.toListItems(hashAlgorithm: hashAlgorithm))
+    }
+
+    if documents.isEmpty, let hashAlgorithm {
+      items.append(.transactionDataRow(overline: .requestTransactionDataHashAlgorithm, value: hashAlgorithm.displayValue))
+    }
+
+    return items
+  }
+}
+
+private extension QesDocumentDigest {
+  func toListItems(hashAlgorithm: QesHashAlgorithm?) -> [PresentationExpandableListItem] {
+    let representation = hashType?.uppercased()
+    var items: [PresentationExpandableListItem] = []
+
+    if let label {
+      items.append(.transactionDataRow(overline: .requestTransactionDataDocument, value: label))
+    }
+
+    if let representation {
+      items.append(.transactionDataRow(overline: .requestTransactionDataHashRepresentation, value: representation))
+    }
+
+    items.append(
+      .transactionDataRow(
+        overline: representation.map { .requestTransactionDataTypedHash([$0]) } ?? .requestTransactionDataHash,
+        value: hash
+      )
+    )
+
+    if let hashAlgorithm {
+      items.append(
+        .transactionDataRow(
+          overline: representation.map { .requestTransactionDataTypedHashAlgorithm([$0]) }
+          ?? .requestTransactionDataHashAlgorithm,
+          value: hashAlgorithm.displayValue
+        )
+      )
+    }
+
+    return items
+  }
+}
+
+private extension QesHashAlgorithm {
+  var displayValue: String {
+    name ?? oid
+  }
+}
+
+private extension ExpandableListItem where T == DocumentElementClaim {
+  static func transactionDataRow(
+    overline: LocalizableStringKey,
+    value: String
+  ) -> Self {
+    .single(
+      .init(
+        collapsed: .init(
+          mainContent: .text(.custom(value)),
+          overlineText: overline
+        ),
+        domainModel: nil
+      )
+    )
+  }
+}
+
+private extension PresentationTransactionDataField {
+  func toExpandableListItem() -> PresentationExpandableListItem {
+    switch value {
+    case .text(let text):
+      .transactionDataRow(overline: .custom(key), value: text)
+    case .group(let fields):
+      .nested(
+        .init(
+          collapsed: .init(mainContent: .text(.custom(key))),
+          expanded: fields.map { $0.toExpandableListItem() },
+          isExpanded: false
         )
       )
     }
@@ -448,25 +599,45 @@ private extension Array where Element == DocClaim {
 }
 
 private extension Array where Element == DocumentElementClaim {
-  func toListItems(claimsAreSelectable: Bool) -> [PresentationExpandableListItem] {
-    self.compactMap { $0.toListItem(claimsAreSelectable: claimsAreSelectable) }
+
+  func toListItems(
+    claimsAreSelectable: Bool,
+    overaskedPaths: Set<[String]>
+  ) -> [PresentationExpandableListItem] {
+    self.compactMap {
+      $0.toListItem(claimsAreSelectable: claimsAreSelectable, overaskedPaths: overaskedPaths)
+    }
   }
 }
 
 private extension DocumentElementClaim {
-  func toListItem(claimsAreSelectable: Bool) -> PresentationExpandableListItem? {
-    return self.toExpandableListItem(claimsAreSelectable: claimsAreSelectable)
+  func toListItem(
+    claimsAreSelectable: Bool,
+    overaskedPaths: Set<[String]>
+  ) -> PresentationExpandableListItem? {
+    return self.toExpandableListItem(
+      claimsAreSelectable: claimsAreSelectable,
+      overaskedPaths: overaskedPaths
+    )
   }
 }
 
 private extension DocumentElementClaim {
-  func toExpandableListItem(claimsAreSelectable: Bool) -> PresentationExpandableListItem? {
+  func toExpandableListItem(
+    claimsAreSelectable: Bool,
+    overaskedPaths: Set<[String]>
+  ) -> PresentationExpandableListItem? {
     switch self {
     case .group(let id, let title, let items):
       return .nested(
         .init(
           collapsed: .init(groupId: id, mainContent: .text(.custom(title))),
-          expanded: items.compactMap { $0.toExpandableListItem(claimsAreSelectable: claimsAreSelectable) },
+          expanded: items.compactMap {
+            $0.toExpandableListItem(
+              claimsAreSelectable: claimsAreSelectable,
+              overaskedPaths: overaskedPaths
+            )
+          },
           isExpanded: false
         )
       )
@@ -475,13 +646,12 @@ private extension DocumentElementClaim {
       let title,
       _,
       _,
-      _,
+      let claimPath,
       _,
       let value,
       let status
     ):
-      // When claims are not selectable (presentation), rows are read-only: no checkbox is shown
-      // and the entire combination is disclosed.
+      let isOverasked = overaskedPaths.contains(claimPath)
       let trailingContent: TrailingContent = claimsAreSelectable
         ? .checkbox(!status.isRequired && status.isAvailable, status.isAvailable, { _ in })
         : .empty
@@ -493,6 +663,8 @@ private extension DocumentElementClaim {
               groupId: id,
               mainContent: .text(.custom(value)),
               overlineText: .custom(title),
+              supportingText: isOverasked ? .notRegisteredData : nil,
+              supportingTextColor: isOverasked ? Theme.shared.color.warning : Theme.shared.color.secondaryLabel,
               isEnable: !status.isRequired,
               trailingContent: trailingContent
             ),
@@ -507,6 +679,8 @@ private extension DocumentElementClaim {
                 groupId: id,
                 mainContent: .image(image),
                 overlineText: .custom(title),
+                supportingText: isOverasked ? .notRegisteredData : nil,
+                supportingTextColor: isOverasked ? Theme.shared.color.warning : Theme.shared.color.secondaryLabel,
                 isEnable: !status.isRequired,
                 trailingContent: trailingContent
               ),
@@ -519,6 +693,8 @@ private extension DocumentElementClaim {
               collapsed: .init(
                 groupId: id,
                 mainContent: .text(.custom(title)),
+                supportingText: isOverasked ? .notRegisteredData : nil,
+                supportingTextColor: isOverasked ? Theme.shared.color.warning : Theme.shared.color.secondaryLabel,
                 leadingContent: .remoteImage(image: image),
                 isEnable: !status.isRequired,
                 trailingContent: trailingContent

@@ -246,9 +246,9 @@ private extension TestStartupInteractor {
     }
   }
 
-  func stubKeyChainClear() {
+  func stubKeyChainClear(success: Bool = true) {
     stub(keyChainController) { mock in
-      when(mock.clear()).thenDoNothing()
+      when(mock.clear()).thenReturn(success)
     }
   }
 

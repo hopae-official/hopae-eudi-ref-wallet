@@ -66,7 +66,7 @@ final actor DocumentDetailsInteractorImpl: DocumentDetailsInteractor {
       )
       return .success
     } catch {
-      return .failure(error)
+      return error.isTrustBlocked ? .issuerNotTrusted : .failure(error)
     }
   }
 
@@ -94,7 +94,7 @@ final actor DocumentDetailsInteractorImpl: DocumentDetailsInteractor {
     do {
 
       if await shouldDeleteAllDocuments(type: type) {
-        await walletController.clearAllDocuments()
+        try await walletController.clearAllDocuments()
         successState = .success(shouldReboot: true)
       } else {
         try await walletController.deleteDocument(with: documentId, status: .issued)
@@ -152,5 +152,6 @@ public enum DocumentDetailsDeletionPartialState: Sendable {
 
 public enum DocumentDetailsReIssuancePartialState: Sendable {
   case success
+  case issuerNotTrusted
   case failure(Error)
 }

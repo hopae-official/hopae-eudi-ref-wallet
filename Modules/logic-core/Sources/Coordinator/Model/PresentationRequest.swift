@@ -19,4 +19,6 @@ public struct PresentationRequest: Sendable, Equatable {
   public let relyingParty: String
   public let dataRequestInfo: String
   public let isTrusted: Bool
+  public let overaskedClaims: [OveraskedClaim]
+  public let transactionDataSets: [[String: [PresentationTransactionData]]]
 }

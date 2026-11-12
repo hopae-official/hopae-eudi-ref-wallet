@@ -37,10 +37,22 @@ final class SettingsViewModel<Router: RouterHost>: ViewModel<Router, SettingsVie
     }
   }
 
+  var isIssuerRegistrationValidationEnabled: Bool = false {
+    didSet {
+      guard !isHydratingIssuerRegistration, oldValue != isIssuerRegistrationValidationEnabled else { return }
+      updateIssuerRegistrationValidation(isIssuerRegistrationValidationEnabled)
+    }
+  }
+
+  var isRestartRequiredAlertShowing: Bool = false
+
   var biometryError: SystemBiometryError?
 
   @ObservationIgnored
   private var isHydratingBatchCounter = false
+
+  @ObservationIgnored
+  private var isHydratingIssuerRegistration = false
 
   private let interactor: SettingsInteractor
   private let walletKitController: WalletKitController
@@ -114,6 +126,10 @@ final class SettingsViewModel<Router: RouterHost>: ViewModel<Router, SettingsVie
     isBatchCounterEnabled = await interactor.isBatchCounterEnabled()
     isHydratingBatchCounter = false
 
+    isHydratingIssuerRegistration = true
+    isIssuerRegistrationValidationEnabled = await interactor.isIssuerRegistrationValidationEnabled()
+    isHydratingIssuerRegistration = false
+
     var items: [SettingMenuItemUIModel] = []
 
     if isBiometryAvailable {
@@ -148,6 +164,24 @@ final class SettingsViewModel<Router: RouterHost>: ViewModel<Router, SettingsVie
           },
           set: { [weak self] newValue in
             self?.isBatchCounterEnabled = newValue
+          }
+        ),
+        action: {}
+      )
+    )
+
+    items.append(
+      .init(
+        title: .validateIssuerRegistration,
+        icon: Theme.shared.image.issuerRegistration,
+        showDivider: true,
+        isToggle: true,
+        toggleBinding: Binding(
+          get: { [weak self] in
+            self?.isIssuerRegistrationValidationEnabled ?? false
+          },
+          set: { [weak self] newValue in
+            self?.isIssuerRegistrationValidationEnabled = newValue
           }
         ),
         action: {}
@@ -215,6 +249,13 @@ final class SettingsViewModel<Router: RouterHost>: ViewModel<Router, SettingsVie
   private func updateBatchCounter(_ isEnabled: Bool) {
     Task {
       await interactor.setBatchCounter(isEnabled: isEnabled)
+    }
+  }
+
+  private func updateIssuerRegistrationValidation(_ isEnabled: Bool) {
+    Task {
+      await interactor.setIssuerRegistrationValidation(isEnabled: isEnabled)
+      isRestartRequiredAlertShowing = true
     }
   }
 }

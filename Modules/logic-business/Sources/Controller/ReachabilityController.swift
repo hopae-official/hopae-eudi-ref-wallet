@@ -84,10 +84,10 @@ final class ReachabilityControllerImpl: ReachabilityController, BKAvailabilityOb
     // then waits for the user's response before returning the actual state.
     // For .allowedAlways: checks the actual BLE power state.
     let timeout: TimeInterval = authorization == .notDetermined ? 60 : 3
-    return Deferred {
-      Future { [weak self] promise in
+    return Deferred { [weak self] in
+      Future { promise in
 
-        guard let self = self else { return }
+        guard let self else { return }
 
         self.$bleAvailibity
           .dropFirst()

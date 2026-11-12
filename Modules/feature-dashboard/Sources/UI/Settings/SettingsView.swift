@@ -38,6 +38,14 @@ struct SettingsView<Router: RouterHost>: View {
     .task {
       await viewModel.initialize()
     }
+    .alertView(
+      isPresented: $viewModel.isRestartRequiredAlertShowing,
+      title: .restartRequiredTitle,
+      message: .restartRequiredMessage,
+      actions: {
+        Button(.okButton) { viewModel.isRestartRequiredAlertShowing = false }
+      }
+    )
     .alert(item: $viewModel.biometryError) { error in
       Alert(
         title: Text(.genericErrorTitle),

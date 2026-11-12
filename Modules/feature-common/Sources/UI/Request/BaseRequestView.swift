@@ -35,6 +35,7 @@ public struct BaseRequestView<Router: RouterHost>: View {
     ) {
       BaseRequestViewContainer(
         viewState: viewModel.viewState,
+        isRiskAcknowledged: $viewModel.isRiskAcknowledged,
         onShare: viewModel.onShare,
         onSelectionChanged: { id in
           Task {
@@ -51,28 +52,6 @@ public struct BaseRequestView<Router: RouterHost>: View {
         }
       )
     }
-    .confirmationDialog(
-      .requestDataInfoNotice,
-      isPresented: $viewModel.isRequestInfoModalShowing,
-      actions: {
-        Button(.okButton) {
-          viewModel.onShowRequestInfoModal()
-        }
-      }, message: {
-        Text(.requestDataSheetCaption)
-      }
-    )
-    .confirmationDialog(
-      viewModel.getTrustedRelyingParty(),
-      isPresented: $viewModel.isVerifiedEntityModalShowing,
-      actions: {
-        Button(.okButton) {
-          viewModel.onVerifiedEntityModal()
-        }
-      }, message: {
-        Text(viewModel.getTrustedRelyingPartyInfo())
-      }
-    )
     .task {
       if !viewModel.viewState.initialized {
         await viewModel.doWork()
@@ -86,16 +65,34 @@ public struct BaseRequestView<Router: RouterHost>: View {
         Button(.okButton) {}
       }
     )
+    .alertView(
+      isPresented: $viewModel.isTrustBlockedAlertShowing,
+      title: .presentationBlockedTitle,
+      message: .presentationBlockedMessage,
+      actions: {
+        Button(.close) { viewModel.onTrustBlockedClose() }
+      }
+    )
   }
 }
 
 private struct BaseRequestViewContainer: View {
 
   let viewState: RequestViewState
+  @Binding var isRiskAcknowledged: Bool
   let onShare: () -> Void
   let onSelectionChanged: (String) -> Void
   var onCombinationSelected: (Int) -> Void = { _ in }
   var onCombinationItemClick: (Int, String) -> Void = { _, _ in }
+
+  private var registrationWarning: RegistrationWarning? {
+    guard viewState.initialized, !viewState.isLoading else { return nil }
+    return viewState.registrationWarning
+  }
+
+  private var canShare: Bool {
+    viewState.allowShare && (registrationWarning == nil || isRiskAcknowledged)
+  }
 
   var body: some View {
     content()
@@ -119,38 +116,47 @@ private struct BaseRequestViewContainer: View {
   @ViewBuilder
   private func scrollableContent() -> some View {
     ScrollView {
-      VStack(spacing: .zero) {
-        ContentHeaderView(
-          config: viewState.contentHeaderConfig,
-          accessibilityDescription: BaseRequestLocators.description
+      VStack(alignment: .leading, spacing: SPACING_MEDIUM) {
+
+        if let registration = viewState.relyingPartyRegistration {
+          RelyingPartyRegistrationView(data: registration)
+            .shimmer(isLoading: viewState.isLoading)
+        }
+
+        titledSection(.requestRequestedDataTitle) {
+          if viewState.combinations.count > 1 {
+            combinationsContent()
+          } else {
+            singleCombinationContent()
+          }
+        }
+
+        VSpacer.medium()
+      }
+      .padding(Theme.shared.dimension.padding)
+    }
+    .safeAreaInset(edge: .bottom, spacing: .zero) {
+      bottomBar()
+    }
+  }
+
+  @MainActor
+  @ViewBuilder
+  private func bottomBar() -> some View {
+    VStack(spacing: SPACING_MEDIUM) {
+      if let registrationWarning {
+        WarningAcknowledgementView(
+          message: registrationWarning.message,
+          acknowledgementText: registrationWarning.acknowledgement,
+          isAcknowledged: $isRiskAcknowledged
         )
         .padding(.horizontal, Theme.shared.dimension.padding)
-
-        ZStack {
-          VStack(alignment: .leading, spacing: SPACING_MEDIUM) {
-
-            if viewState.combinations.count > 1 {
-              combinationsContent()
-            } else {
-              singleCombinationContent()
-            }
-
-            Text(.shareDataReview)
-              .typography(Theme.shared.font.bodyMedium)
-              .foregroundColor(Theme.shared.color.primaryLabel)
-              .multilineTextAlignment(.leading)
-              .shimmer(isLoading: viewState.isLoading)
-
-            VSpacer.medium()
-          }
-          .padding(.top, Theme.shared.dimension.padding)
-        }
-        .padding(Theme.shared.dimension.padding)
       }
-    }
-    .safeAreaInset(edge: .bottom) {
+
       shareButton()
     }
+    .padding(.top, SPACING_MEDIUM)
+    .background(Theme.shared.color.background)
   }
 
   @MainActor
@@ -200,16 +206,60 @@ private struct BaseRequestViewContainer: View {
     _ section: RequestDataUiModel,
     onItemClick: @escaping (String) -> Void
   ) -> some View {
+    VStack(alignment: .leading, spacing: SPACING_MEDIUM) {
+      WrapExpandableListView(
+        header: .init(
+          mainContent: .text(.custom(section.section.title)),
+          supportingText: .viewDetails
+        ),
+        items: section.section.listItems,
+        backgroundColor: Theme.shared.color.groupedElevatedBackground,
+        hideSensitiveContent: false,
+        isLoading: viewState.isLoading,
+        onItemClick: { onItemClick($0.groupId) }
+      )
+
+      if !section.transactionData.isEmpty {
+        titledSection(.requestTransactionDataSectionTitle) {
+          ForEach(section.transactionData) { transaction in
+            transactionDataSection(transaction)
+          }
+        }
+      }
+    }
+  }
+
+  @MainActor
+  @ViewBuilder
+  private func titledSection<Content: View>(
+    _ title: LocalizableStringKey,
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    VStack(alignment: .leading, spacing: SPACING_SMALL) {
+      Text(title)
+        .typography(Theme.shared.font.bodyMedium)
+        .fontWeight(.semibold)
+        .foregroundColor(Theme.shared.color.primaryLabel)
+        .shimmer(isLoading: viewState.isLoading)
+
+      VStack(alignment: .leading, spacing: SPACING_MEDIUM) {
+        content()
+      }
+    }
+  }
+
+  @MainActor
+  @ViewBuilder
+  private func transactionDataSection(_ transaction: PresentationListItemSection) -> some View {
     WrapExpandableListView(
       header: .init(
-        mainContent: .text(.custom(section.section.title)),
+        mainContent: .text(.custom(transaction.title)),
         supportingText: .viewDetails
       ),
-      items: section.section.listItems,
+      items: transaction.listItems,
       backgroundColor: Theme.shared.color.groupedElevatedBackground,
       hideSensitiveContent: false,
-      isLoading: viewState.isLoading,
-      onItemClick: { onItemClick($0.groupId) }
+      isLoading: viewState.isLoading
     )
   }
 
@@ -220,7 +270,7 @@ private struct BaseRequestViewContainer: View {
       style: .primary,
       title: .shareButton,
       isLoading: viewState.isLoading,
-      isEnabled: viewState.allowShare,
+      isEnabled: canShare,
       onAction: onShare()
     )
     .combineChilrenAccessibility(
@@ -234,11 +284,10 @@ private struct BaseRequestViewContainer: View {
   @ViewBuilder
   private func noDocumentsFound(errorTitle: LocalizableStringKey) -> some View {
     VStack(spacing: .zero) {
-      ContentHeaderView(
-        config: viewState.contentHeaderConfig,
-        accessibilityDescription: BaseRequestLocators.description
-      )
-      .padding(.horizontal, Theme.shared.dimension.padding)
+      if let registration = viewState.relyingPartyRegistration {
+        RelyingPartyRegistrationView(data: registration)
+          .padding(.horizontal, Theme.shared.dimension.padding)
+      }
 
       VStack(spacing: .zero) {
         Spacer()
@@ -261,22 +310,29 @@ private struct BaseRequestViewContainer: View {
     items: RequestDataUiModel.mockData(),
     combinations: [RequestDataUiModel.mockData()],
     selectedCombinationIndex: 0,
-    trustedRelyingPartyInfo: .requestDataVerifiedEntityMessage,
     relyingParty: .custom("relying party"),
     isTrusted: true,
     allowShare: true,
     originator: .featureDashboardModule(.dashboard),
     initialized: true,
-    contentHeaderConfig: .init(
-      appIconAndTextData: AppIconAndTextData(
-        appIcon: ThemeManager.shared.image.logoEuDigitalIndentityWallet
+    relyingPartyRegistration: RelyingPartyRegistrationData(
+      primary: RegisteredParty(
+        name: .custom("NordicBank A/S"),
+        identifier: .relyingPartyId(["rp:nordicbank:prod"]),
+        isVerified: true
+      ),
+      privacyPolicyUrl: URL(string: "https://nordicbank.example/privacy"),
+      intendedUse: .custom(
+        "We will use your identity and age to verify you for a new current account. Your data will be used once to complete onboarding and to meet anti-money laundering requirements."
       )
-    )
+    ),
+    registrationWarning: nil
   )
 
   ContentScreenView {
     BaseRequestViewContainer(
       viewState: viewState,
+      isRiskAcknowledged: .constant(false),
       onShare: {},
       onSelectionChanged: { _ in }
     )

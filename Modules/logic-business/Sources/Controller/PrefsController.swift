@@ -68,7 +68,10 @@ final class PrefsControllerImpl: PrefsController {
 
 private enum SharedPrefs {
   private static let didRegisterDefaults: Void = {
-    let defaults = [Prefs.Key.batchCounter.rawValue: true]
+    let defaults = [
+      Prefs.Key.batchCounter.rawValue: true,
+      Prefs.Key.validateIssuerRegistrationCertificate.rawValue: false
+    ]
     if let suiteName = Bundle.getAppGroupIdentifier(),
        let sharedDefaults = UserDefaults(suiteName: suiteName) {
       sharedDefaults.register(defaults: defaults)
@@ -97,5 +100,7 @@ public extension Prefs {
     case language
     case introLastDismissedVersion
     case batchCounter
+    case validateIssuerRegistrationCertificate
+    case trustMarkIntroductionCompleted
   }
 }
