@@ -14,11 +14,23 @@
  * governing permissions and limitations under the Licence.
  */
 
+import logic_resources
+
 public struct PresentationRequest: Sendable, Equatable {
   public let itemSets: [[DocElements]]
   public let relyingParty: String
   public let dataRequestInfo: String
   public let isTrusted: Bool
   public let overaskedClaims: [OveraskedClaim]
-  public let transactionDataSets: [[String: [PresentationTransactionData]]]
+  public let transactionDataSets: [[String: [PresentationTransactionDataDomain]]]
+  public let requestNames: [String?]
+}
+
+extension PresentationRequest {
+
+  /// The relying party's name for the request screen: the name in its certificate only once it has
+  /// authenticated, otherwise the generic name, as the Android wallet does.
+  static func relyingPartyName(certificateName: String?, isTrusted: Bool) -> String {
+    (isTrusted ? certificateName : nil) ?? LocalizableStringKey.unknownVerifier.toString
+  }
 }

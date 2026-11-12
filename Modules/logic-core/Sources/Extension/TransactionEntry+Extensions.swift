@@ -17,12 +17,15 @@ import Foundation
 import MdocDataModel18013
 import logic_business
 import logic_storage
+import struct OpenID4VP.SupportedTransactionDataType
 
 extension TransactionEntry {
   func toTransactionLogDomain(
     id: String,
     parentPresentationId: String?,
-    actionChannel: TransactionActionChannel? = nil
+    actionChannel: TransactionActionChannel? = nil,
+    registrationCheck: RecordedRegistrationCheck? = nil,
+    transactionDataTypes: [SupportedTransactionDataType] = []
   ) -> TransactionLogDomain? {
     switch self {
     case .presentation(let entry):
@@ -40,7 +43,11 @@ extension TransactionEntry {
           intermediary: entry.intermediaryDomain,
           registration: entry.registrationDomain,
           claimsRequested: entry.listOfClaimsRequested.toDomain(),
-          claimsPresented: entry.listOfClaimsPresented.toDomain()
+          claimsPresented: entry.listOfClaimsPresented.toDomain(),
+          transactionData: entry.transactionalData?.toPresentationTransactionDataDomains(
+            supportedTypes: transactionDataTypes
+          ) ?? [],
+          registrationCheck: registrationCheck
         )
       )
     case .credentialIssuance(let entry):
@@ -131,14 +138,16 @@ extension TransactionEntry {
 
   func toTransactionLogStorage(
     parentPresentationId: String?,
-    actionChannel: TransactionActionChannel? = nil
+    actionChannel: TransactionActionChannel? = nil,
+    registrationCheck: RecordedRegistrationCheck? = nil
   ) throws -> logic_storage.TransactionLog {
     let data = try JSONEncoder().encode(self)
     return .init(
       identifier: transactionIdentifier,
       value: try data.toJSONString(),
       parentPresentationId: parentPresentationId,
-      actionChannel: actionChannel?.rawValue
+      actionChannel: actionChannel?.rawValue,
+      registrationCheck: registrationCheck?.rawValue
     )
   }
 
@@ -160,11 +169,15 @@ extension logic_storage.TransactionLog {
     return try? JSONDecoder().decode(TransactionEntry.self, from: data)
   }
 
-  func toTransactionLogDomain() -> TransactionLogDomain? {
+  func toTransactionLogDomain(
+    transactionDataTypes: [SupportedTransactionDataType] = []
+  ) -> TransactionLogDomain? {
     toTransactionEntry()?.toTransactionLogDomain(
       id: identifier,
       parentPresentationId: parentPresentationId,
-      actionChannel: actionChannel.flatMap { TransactionActionChannel(rawValue: $0) }
+      actionChannel: actionChannel.flatMap { TransactionActionChannel(rawValue: $0) },
+      registrationCheck: registrationCheck.flatMap { RecordedRegistrationCheck(rawValue: $0) },
+      transactionDataTypes: transactionDataTypes
     )
   }
 }

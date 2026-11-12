@@ -28,7 +28,8 @@ public struct RequestDataUiModel: Identifiable, Equatable, Sendable, Routable {
   public var id: String
 
   public let section: PresentationListItemSection
-  public let transactionData: [PresentationListItemSection]
+  /// The ids of the claims that hold a picture of the holder (`ConfigUiLogic.userImageClaimKeys`).
+  public let userImageItemIds: Set<String>
 
   public var log: String {
     "id: \(section.id), title: \(section.title)"
@@ -37,10 +38,24 @@ public struct RequestDataUiModel: Identifiable, Equatable, Sendable, Routable {
   public init(
     id: String = UUID().uuidString,
     section: PresentationListItemSection,
-    transactionData: [PresentationListItemSection] = []
+    userImageItemIds: Set<String> = []
   ) {
     self.id = id
     self.section = section
+    self.userImageItemIds = userImageItemIds
+  }
+}
+
+@Copyable
+public struct RequestCombinationUiModel: Equatable, Sendable {
+  public let documents: [RequestDataUiModel]
+  public let transactionData: RequestTransactionDataUiModel?
+
+  public init(
+    documents: [RequestDataUiModel],
+    transactionData: RequestTransactionDataUiModel? = nil
+  ) {
+    self.documents = documents
     self.transactionData = transactionData
   }
 }
@@ -300,6 +315,35 @@ public extension Array where Element == RequestDataUiModel {
       return false
     }
   }
+
+  /// True when a document of the option requests a picture of the holder, such as the portrait.
+  func requestsUserImage() -> Bool {
+    contains { !$0.userImageItemIds.isEmpty }
+  }
+
+  /// True when Share would disclose a picture of the holder: its row is selected, or has no checkbox because the
+  /// document's claims are disclosed as a whole.
+  func sharesUserImage() -> Bool {
+    contains { model in
+      model.section.listItems.contains { $0.disclosesAnyOf(model.userImageItemIds) }
+    }
+  }
+}
+
+private extension ExpandableListItem where T == DocumentElementClaim {
+  /// True when a row among `itemIds` would be disclosed: selected, or without a checkbox.
+  func disclosesAnyOf(_ itemIds: Set<String>) -> Bool {
+    switch self {
+    case .nested(let item):
+      return item.expanded.contains { $0.disclosesAnyOf(itemIds) }
+    case .single(let item):
+      guard let id = item.domainModel?.id, itemIds.contains(id) else { return false }
+      if case .checkbox(_, let isSelected, _) = item.collapsed.trailingContent {
+        return isSelected
+      }
+      return true
+    }
+  }
 }
 
 public extension RequestDataUiModel {
@@ -360,8 +404,8 @@ public extension Array where Element == DocElements {
   func toUiModels(
     with walletKitController: WalletKitController,
     claimsAreSelectable: Bool = true,
-    overaskedPaths: [String: Set<[String]>] = [:],
-    transactionData: [String: [PresentationTransactionData]] = [:]
+    userImageClaimKeys: Set<String> = [],
+    overaskedPaths: [String: Set<[String]>] = [:]
   ) -> [RequestDataUiModel] {
     self.compactMap { element in
 
@@ -429,144 +473,7 @@ public extension Array where Element == DocElements {
             overaskedPaths: overaskedPathsForDocument
           )
         ),
-        transactionData: (transactionData[element.docId] ?? []).map { $0.toListItemSection() }
-      )
-    }
-  }
-}
-
-private let transactionDataValueSeparator = " · "
-
-private extension PresentationTransactionData {
-  func toListItemSection() -> PresentationListItemSection {
-    switch content {
-    case .qesApproval(let qesApproval):
-      .init(
-        id: UUID().uuidString,
-        title: LocalizableStringKey.requestTransactionDataSignatureDetails.toString,
-        listItems: qesApproval.toListItems()
-      )
-    case .generic(let fields):
-      .init(
-        id: UUID().uuidString,
-        title: LocalizableStringKey.requestTransactionDataTitle.toString,
-        listItems: [.transactionDataRow(overline: .requestTransactionDataType, value: type)]
-        + fields.map { $0.toExpandableListItem() }
-      )
-    }
-  }
-}
-
-private extension QesApprovalTransactionData {
-  func toListItems() -> [PresentationExpandableListItem] {
-    var items: [PresentationExpandableListItem] = [
-      .transactionDataRow(overline: .requestTransactionDataTrustFramework, value: trustFramework),
-      .transactionDataRow(
-        overline: .requestTransactionDataType,
-        value: LocalizableStringKey.requestTransactionDataTypeQes.toString
-      )
-    ]
-
-    if !credentialIds.isEmpty {
-      items.append(
-        .transactionDataRow(
-          overline: .requestTransactionDataRequestedCredentials,
-          value: credentialIds.joined(separator: transactionDataValueSeparator)
-        )
-      )
-    }
-
-    if let signingCredentialId {
-      items.append(.transactionDataRow(overline: .requestTransactionDataSigningCredentialId, value: signingCredentialId))
-    }
-
-    if let numberOfSignatures {
-      items.append(
-        .transactionDataRow(overline: .requestTransactionDataNumberOfSignatures, value: String(numberOfSignatures))
-      )
-    }
-
-    documents.forEach { document in
-      items.append(contentsOf: document.toListItems(hashAlgorithm: hashAlgorithm))
-    }
-
-    if documents.isEmpty, let hashAlgorithm {
-      items.append(.transactionDataRow(overline: .requestTransactionDataHashAlgorithm, value: hashAlgorithm.displayValue))
-    }
-
-    return items
-  }
-}
-
-private extension QesDocumentDigest {
-  func toListItems(hashAlgorithm: QesHashAlgorithm?) -> [PresentationExpandableListItem] {
-    let representation = hashType?.uppercased()
-    var items: [PresentationExpandableListItem] = []
-
-    if let label {
-      items.append(.transactionDataRow(overline: .requestTransactionDataDocument, value: label))
-    }
-
-    if let representation {
-      items.append(.transactionDataRow(overline: .requestTransactionDataHashRepresentation, value: representation))
-    }
-
-    items.append(
-      .transactionDataRow(
-        overline: representation.map { .requestTransactionDataTypedHash([$0]) } ?? .requestTransactionDataHash,
-        value: hash
-      )
-    )
-
-    if let hashAlgorithm {
-      items.append(
-        .transactionDataRow(
-          overline: representation.map { .requestTransactionDataTypedHashAlgorithm([$0]) }
-          ?? .requestTransactionDataHashAlgorithm,
-          value: hashAlgorithm.displayValue
-        )
-      )
-    }
-
-    return items
-  }
-}
-
-private extension QesHashAlgorithm {
-  var displayValue: String {
-    name ?? oid
-  }
-}
-
-private extension ExpandableListItem where T == DocumentElementClaim {
-  static func transactionDataRow(
-    overline: LocalizableStringKey,
-    value: String
-  ) -> Self {
-    .single(
-      .init(
-        collapsed: .init(
-          mainContent: .text(.custom(value)),
-          overlineText: overline
-        ),
-        domainModel: nil
-      )
-    )
-  }
-}
-
-private extension PresentationTransactionDataField {
-  func toExpandableListItem() -> PresentationExpandableListItem {
-    switch value {
-    case .text(let text):
-      .transactionDataRow(overline: .custom(key), value: text)
-    case .group(let fields):
-      .nested(
-        .init(
-          collapsed: .init(mainContent: .text(.custom(key))),
-          expanded: fields.map { $0.toExpandableListItem() },
-          isExpanded: false
-        )
+        userImageItemIds: dataFields.userImageItemIds(userImageClaimKeys: userImageClaimKeys)
       )
     }
   }
@@ -599,6 +506,20 @@ private extension Array where Element == DocClaim {
 }
 
 private extension Array where Element == DocumentElementClaim {
+
+  /// The ids of the claims, in groups too, whose last path element is one of `userImageClaimKeys`.
+  func userImageItemIds(userImageClaimKeys: Set<String>) -> Set<String> {
+    reduce(into: Set<String>()) { ids, claim in
+      switch claim {
+      case .group(_, _, let items):
+        ids.formUnion(items.userImageItemIds(userImageClaimKeys: userImageClaimKeys))
+      case .primitive(let id, _, _, _, let path, _, _, _):
+        if let key = path.last, userImageClaimKeys.contains(key) {
+          ids.insert(id)
+        }
+      }
+    }
+  }
 
   func toListItems(
     claimsAreSelectable: Bool,

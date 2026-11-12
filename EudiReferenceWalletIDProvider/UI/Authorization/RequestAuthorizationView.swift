@@ -21,6 +21,7 @@ import feature_common
 struct RequestAuthorizationView: View {
 
   @State private var viewModel: RequestAuthorizationViewModel
+  @State private var scrollAreaHeight: CGFloat = .zero
 
   init(with viewModel: RequestAuthorizationViewModel) {
     self._viewModel = State(wrappedValue: viewModel)
@@ -45,8 +46,17 @@ struct RequestAuthorizationView: View {
       }
       .shimmer(isLoading: viewModel.viewState.isLoading)
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .task {
-        await viewModel.loadRequest()
+      .alertView(
+        isPresented: $viewModel.isUserImageConfirmationShowing,
+        title: .requestUserImageConfirmationTitle,
+        message: .requestUserImageConfirmationMessage,
+        actions: {
+          Button(.shareButton) { viewModel.onUserImageShareConfirmed() }
+          Button(.cancelButton, role: .cancel) {}
+        }
+      )
+      .onAppear {
+        viewModel.initialize()
       }
     }
   }
@@ -56,39 +66,65 @@ struct RequestAuthorizationView: View {
     viewState: RequestAuthorizationViewState
   ) -> some View {
     VStack(spacing: SPACING_SMALL) {
-      ScrollView {
-        VStack(spacing: .zero) {
-          ContentHeaderView(
-            config: viewState.contentHeaderConfig
-          )
+      ScrollViewReader { proxy in
+        ScrollView {
+          VStack(spacing: .zero) {
+            ContentHeaderView(
+              config: viewState.contentHeaderConfig
+            )
+            .padding(.horizontal, Theme.shared.dimension.padding)
 
-          VStack(alignment: .leading, spacing: SPACING_MEDIUM) {
-            ForEach(viewState.items.indices, id: \.self) { index in
-              let section = viewState.items[index]
-              WrapExpandableListView(
-                header: .init(
-                  mainContent: .text(.custom(section.section.title)),
-                  supportingText: .viewDetails
-                ),
-                items: section.section.listItems,
-                backgroundColor: Theme.shared.color.groupedElevatedBackground,
-                hideSensitiveContent: false,
-                isLoading: viewState.isLoading
-              )
-              .accessibilityElement()
-              .combineChilrenAccessibility(
-                locator: BaseRequestLocators.requestedDocument(index.string)
-              )
+            VStack(alignment: .leading, spacing: SPACING_MEDIUM) {
+              if viewState.requestsUserImage {
+                WarningNoticeView(message: .requestUserImageNotice)
+              }
+
+              ForEach(viewState.items.indices, id: \.self) { index in
+                let section = viewState.items[index]
+                WrapExpandableListView(
+                  header: .init(
+                    mainContent: .text(.custom(section.section.title)),
+                    supportingText: .viewDetails
+                  ),
+                  items: section.section.listItems,
+                  backgroundColor: Theme.shared.color.groupedElevatedBackground,
+                  hideSensitiveContent: false,
+                  isLoading: viewState.isLoading,
+                  onExpand: { headerId, height in
+                    showOpened(headerId ?? section.id, height: height, with: proxy)
+                  }
+                )
+                .id(section.id)
+                .accessibilityElement()
+                .combineChilrenAccessibility(
+                  locator: BaseRequestLocators.requestedDocument(index.string)
+                )
+              }
             }
+            .padding(.horizontal, Theme.shared.dimension.padding)
+            .padding(.top, SPACING_MEDIUM)
+            .padding(.bottom, SPACING_SMALL)
           }
-          .padding(.horizontal, Theme.shared.dimension.padding)
-          .padding(.top, SPACING_MEDIUM)
-          .padding(.bottom, SPACING_SMALL)
+          .shimmer(isLoading: viewState.isLoading)
         }
-        .shimmer(isLoading: viewState.isLoading)
+        .onGeometryChange(for: CGFloat.self) { geometry in
+          geometry.size.height - geometry.safeAreaInsets.top - geometry.safeAreaInsets.bottom
+        } action: { height in
+          scrollAreaHeight = height
+        }
       }
 
       actionButtonsFooter()
+    }
+  }
+
+  /// The sheet's buttons, and its warning when one is shown, stay fixed below a short scroll area, so the claims
+  /// of a document or group opened near the scroll area's bottom edge would be out of sight. An opened item that
+  /// fits is scrolled the least that shows it whole, which keeps as much of the requester in view as there is room
+  /// for; a taller one is scrolled to the top, so its first claims show rather than its last.
+  private func showOpened(_ id: String, height: CGFloat, with proxy: ScrollViewProxy) {
+    withAnimation {
+      proxy.scrollTo(id, anchor: height > scrollAreaHeight ? .top : nil)
     }
   }
 
@@ -98,6 +134,7 @@ struct RequestAuthorizationView: View {
       ContentHeaderView(
         config: viewModel.viewState.contentHeaderConfig
       )
+      .padding(.horizontal, Theme.shared.dimension.padding)
       VStack(spacing: .zero) {
         Spacer()
         if let errorMessage = viewModel.viewState.errorMessage {
@@ -118,7 +155,15 @@ struct RequestAuthorizationView: View {
 
   @ViewBuilder
   private func actionButtonsFooter() -> some View {
-    VStack(spacing: .zero) {
+    VStack(spacing: SPACING_MEDIUM) {
+      if let warning = viewModel.viewState.warning, viewModel.viewState.errorMessage == nil {
+        WarningAcknowledgementView(
+          message: warning.message,
+          acknowledgementText: warning.acknowledgement,
+          isAcknowledged: $viewModel.isRiskAcknowledged
+        )
+        .padding(.horizontal, Theme.shared.dimension.padding)
+      }
       actionButtons()
         .padding(.horizontal, Theme.shared.dimension.padding)
         .padding(.bottom, SPACING_MEDIUM)
@@ -144,8 +189,9 @@ struct RequestAuthorizationView: View {
       style: .primary,
       title: .documentProviderExtensionAcceptButton,
       isLoading: viewModel.viewState.isLoading,
+      isEnabled: viewModel.canAccept,
       onAction: {
-        viewModel.showBiometryView = true
+        viewModel.onAcceptClick()
       }()
     )
   }

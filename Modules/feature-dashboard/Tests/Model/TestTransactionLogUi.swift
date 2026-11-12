@@ -41,6 +41,19 @@ final class TestTransactionLogUi: EudiTest {
     ]
   }
 
+  func testPrivacyPolicyFields_WhenALinkIsNotHttps_ThenItIsShownAsTextOnly() {
+    let fields = TransactionDetailsFieldUi.privacyPolicyFields(
+      .init(
+        registrarUrl: nil,
+        purpose: nil,
+        privacyPolicyUrls: ["https://rp.example/privacy", "http://rp.example/privacy"],
+        dpa: nil
+      )
+    )
+
+    XCTAssertEqual(fields.map(\.url), [URL(string: "https://rp.example/privacy"), nil])
+  }
+
   func testTransformToTransactionUI_WhenPresentation_ThenUsesPartyNameAndType() {
     let ui = Constants.eudiRemoteVerifierMock.transformToTransactionUI()
 
@@ -305,6 +318,92 @@ final class TestTransactionLogUi: EudiTest {
     XCTAssertEqual(ui.sections[0].fields.map(\.id), ["document:name"])
   }
 
+  func testToUiModel_WhenPresentationRecordsTransactionData_ThenTheSigningRequestFollowsTheSharedData() {
+    let log = TransactionLogDomain.presentation(
+      .init(
+        id: "1", time: time, result: .completed, party: noParty, intermediary: nil, registration: nil,
+        claimsRequested: [], claimsPresented: [],
+        transactionData: [
+          .qes(.init(credentialIds: ["pid"], signatureRequests: [])),
+          .unavailable
+        ]
+      )
+    )
+
+    let ui = log.toUiModel()
+
+    XCTAssertEqual(ui.sections.map(\.id), ["requested", "shared", "transaction-data"])
+    let signingRequest = ui.sections[2]
+    XCTAssertEqual(signingRequest.title, .transactionDetailsSigningRequest)
+    XCTAssertTrue(signingRequest.fields.isEmpty)
+    XCTAssertEqual(signingRequest.groups.map(\.title), [LocalizableStringKey.requestTransactionDataSignatureDetails.toString])
+    XCTAssertEqual(
+      signingRequest.groups[0].listItems.map(\.id),
+      [
+        "transaction-data/framework",
+        "transaction-data/transaction-0/title",
+        "transaction-data/transaction-0/query-0",
+        "transaction-data/transaction-1/title",
+        "transaction-data/transaction-1/unavailable"
+      ]
+    )
+  }
+
+  func testToUiModel_WhenPresentationRecordsNoTransactionData_ThenThereIsNoSigningRequest() {
+    let log = TransactionLogDomain.presentation(
+      .init(
+        id: "1", time: time, result: .completed, party: noParty, intermediary: nil, registration: nil,
+        claimsRequested: [], claimsPresented: []
+      )
+    )
+
+    XCTAssertEqual(log.toUiModel().sections.map(\.id), ["requested", "shared"])
+  }
+
+  func testContacts_WhenTheRegistrationWasIssuedToAnotherParty_ThenOffersNoDeletionAndWarns() {
+    let presentation = sharedPresentation(registrationCheck: .notBoundToRequester)
+
+    XCTAssertTrue(presentation.contacts(for: .requestDataDeletion).isEmpty)
+    XCTAssertFalse(presentation.contacts(for: .reportSuspiciousTransaction).isEmpty)
+    XCTAssertEqual(presentation.registrationWarning, .transactionDetailsRegistrationNotBoundWarning)
+  }
+
+  func testRegistrationWarning_WhenTheRegistrationWasNotVerifiedOrNotRecorded_ThenWarns() {
+    for check in [RecordedRegistrationCheck.notVerified, .notEvaluated, nil] {
+      let presentation = sharedPresentation(registrationCheck: check)
+
+      XCTAssertEqual(presentation.registrationWarning, .transactionDetailsRegistrationNotVerifiedWarning)
+      XCTAssertFalse(presentation.contacts(for: .requestDataDeletion).isEmpty)
+    }
+  }
+
+  func testRegistrationWarning_WhenOnlyAPartyIdentifierOrAnIntermediaryWasRecorded_ThenWarns() {
+    let withIdentifier = TransactionLogDomain.Presentation(
+      id: "1", time: time, result: .completed,
+      party: .init(name: "Verifier", identifier: .init(schemeUri: "scheme", value: "rp"), contacts: []),
+      intermediary: nil, registration: nil, claimsRequested: [], claimsPresented: [], registrationCheck: .notVerified
+    )
+    let withIntermediary = TransactionLogDomain.Presentation(
+      id: "2", time: time, result: .completed,
+      party: .init(name: "Verifier", identifier: nil, contacts: []),
+      intermediary: .init(name: "Intermediary", identifier: nil, contacts: []),
+      registration: nil, claimsRequested: [], claimsPresented: [], registrationCheck: nil
+    )
+    let withNothing = TransactionLogDomain.Presentation(
+      id: "3", time: time, result: .completed,
+      party: .init(name: "Verifier", identifier: nil, contacts: []),
+      intermediary: nil, registration: nil, claimsRequested: [], claimsPresented: [], registrationCheck: nil
+    )
+
+    XCTAssertEqual(withIdentifier.registrationWarning, LocalizableStringKey.transactionDetailsRegistrationNotVerifiedWarning)
+    XCTAssertEqual(withIntermediary.registrationWarning, LocalizableStringKey.transactionDetailsRegistrationNotVerifiedWarning)
+    XCTAssertNil(withNothing.registrationWarning)
+  }
+
+  func testRegistrationWarning_WhenTheRegistrationWasVerified_ThenDoesNotWarn() {
+    XCTAssertNil(sharedPresentation(registrationCheck: .verified).registrationWarning)
+  }
+
   func testContacts_WhenNothingWasPresented_ThenDeletionCannotBeRequested() {
     let presentation = TransactionLogDomain.Presentation(
       id: "1", time: time, result: .notCompleted(reason: nil),
@@ -517,7 +616,8 @@ final class TestTransactionLogUi: EudiTest {
         intermediary: .init(name: "Broker", identifier: nil, contacts: []),
         registration: .init(registrarUrl: "https://registry.example", purpose: "Age check", privacyPolicyUrls: ["https://verifier.example/privacy"], dpa: .init(name: "DPA", country: "GR", contacts: ["dpa@example.org"])),
         claimsRequested: [.init(credential: .init(identifier: .mDocPid), claims: [])],
-        claimsPresented: []
+        claimsPresented: [],
+        registrationCheck: .verified
       )
     )
 
@@ -540,5 +640,19 @@ final class TestTransactionLogUi: EudiTest {
     XCTAssertEqual(groups[3][0].listItem.overlineText, .transactionDetailsIntermediaryNameLabel)
     XCTAssertEqual(ui.sections[0].groups.first?.listItems.first?.title, LocalizableStringKey.transactionDetailsNoClaims.toString)
     XCTAssertTrue(ui.sections[1].isEmpty)
+  }
+}
+
+private extension TestTransactionLogUi {
+  func sharedPresentation(registrationCheck: RecordedRegistrationCheck?) -> TransactionLogDomain.Presentation {
+    TransactionLogDomain.Presentation(
+      id: "1", time: time, result: .completed,
+      party: .init(name: "Verifier", identifier: nil, contacts: ["support@verifier.example"]),
+      intermediary: nil,
+      registration: .init(registrarUrl: nil, purpose: nil, privacyPolicyUrls: [], dpa: .init(name: "DPA", country: nil, contacts: ["https://dpa.example"])),
+      claimsRequested: [],
+      claimsPresented: [.init(credential: .init(identifier: .mDocPid), claims: [])],
+      registrationCheck: registrationCheck
+    )
   }
 }

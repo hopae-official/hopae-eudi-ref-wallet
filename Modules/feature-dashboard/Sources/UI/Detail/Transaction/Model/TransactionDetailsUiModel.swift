@@ -14,6 +14,7 @@
  * governing permissions and limitations under the Licence.
  */
 import Foundation
+import feature_common
 import logic_ui
 import logic_core
 import logic_business
@@ -116,7 +117,10 @@ extension TransactionLogDomain {
       let policies = TransactionDetailsFieldUi.privacyPolicyFields(log.registration)
       let contacts = TransactionDetailsFieldUi.contactFields(log.party, prefix: "party")
       let intermediary = log.intermediary.map { TransactionDetailsFieldUi.intermediaryFields($0) } ?? []
-      let groups = [purpose, policies, contacts, intermediary].filter { !$0.isEmpty }
+      let warning = log.registrationWarning.map {
+        [TransactionDetailsFieldUi.field(id: "party:registration-warning", label: nil, value: $0.toString)]
+      } ?? []
+      let groups = [warning, purpose, policies, contacts, intermediary].filter { !$0.isEmpty }
       return .init(type: log.party.type, details: groups)
     case .credentialIssuance(let log):
       let counts = TransactionDetailsFieldUi.countFields(log.details)
@@ -145,7 +149,7 @@ extension TransactionLogDomain {
       return [
         .claims(id: "requested", title: .transactionDetailsDataRequested, claims: log.claimsRequested, emptyText: .transactionDetailsNoDataRequested),
         .claims(id: "shared", title: .transactionDetailsDataShare, claims: log.claimsPresented, emptyText: .transactionDetailsNoDataShared)
-      ]
+      ] + TransactionDetailsSectionUi.transactionData(log.transactionData)
     case .credentialIssuance(let log):
       return TransactionDetailsSectionUi.credentialList(log.details.credentials, title: .transactionDetailsCredentialsIssuedSection)
     case .credentialReissuance(let log):
@@ -211,6 +215,26 @@ extension TransactionDetailsSectionUi {
     )
   }
 
+  static func transactionData(_ transactions: [PresentationTransactionDataDomain]) -> [TransactionDetailsSectionUi] {
+    guard !transactions.isEmpty else { return [] }
+    let sectionId = "transaction-data"
+    return [
+      .init(
+        id: sectionId,
+        title: .transactionDetailsSigningRequest,
+        fields: [],
+        groups: [
+          .init(
+            id: sectionId,
+            title: LocalizableStringKey.requestTransactionDataSignatureDetails.toString,
+            listItems: transactions.toRecordedTransactionDataItems(sectionId: sectionId)
+          )
+        ],
+        emptyText: .transactionDetailsNoInformation
+      )
+    ]
+  }
+
   static func signing(_ log: TransactionLogDomain.SigningSealing) -> [TransactionDetailsSectionUi] {
     guard let fileName = log.fileName, !fileName.isBlankValue else { return [] }
     return [
@@ -254,10 +278,16 @@ extension TransactionDetailsFieldUi {
     return [.field(id: "party:purpose", label: .transactionDetailsPurposeLabel, value: purpose)]
   }
 
+  /// A privacy-policy link opens only when it is `https`, as on Android; otherwise it is shown as text.
   static func privacyPolicyFields(_ registration: PresentationRegistrationDomain?) -> [TransactionDetailsFieldUi] {
     (registration?.privacyPolicyUrls ?? []).enumerated().compactMap { index, policy in
       guard !policy.isBlankValue else { return nil }
-      return .field(id: "party:privacy:\(index)", label: .transactionDetailsPrivacyPolicyLabel, value: policy, url: policy.webUrl)
+      return .field(
+        id: "party:privacy:\(index)",
+        label: .transactionDetailsPrivacyPolicyLabel,
+        value: policy,
+        url: policy.webUrl.flatMap(\.httpsWebLink)
+      )
     }
   }
 

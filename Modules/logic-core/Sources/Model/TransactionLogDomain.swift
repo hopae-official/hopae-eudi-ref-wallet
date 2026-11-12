@@ -77,6 +77,9 @@ public enum TransactionLogDomain: Sendable, Equatable {
     public let registration: PresentationRegistrationDomain?
     public let claimsRequested: [CredentialClaimsDomain]
     public let claimsPresented: [CredentialClaimsDomain]
+    public let transactionData: [PresentationTransactionDataDomain]
+    /// The registration outcome recorded when the data was shared; nil when none was recorded.
+    public let registrationCheck: RecordedRegistrationCheck?
 
     public init(
       id: String,
@@ -86,7 +89,9 @@ public enum TransactionLogDomain: Sendable, Equatable {
       intermediary: InteractingPartyDomain?,
       registration: PresentationRegistrationDomain?,
       claimsRequested: [CredentialClaimsDomain],
-      claimsPresented: [CredentialClaimsDomain]
+      claimsPresented: [CredentialClaimsDomain],
+      transactionData: [PresentationTransactionDataDomain] = [],
+      registrationCheck: RecordedRegistrationCheck? = nil
     ) {
       self.id = id
       self.time = time
@@ -96,6 +101,19 @@ public enum TransactionLogDomain: Sendable, Equatable {
       self.registration = registration
       self.claimsRequested = claimsRequested
       self.claimsPresented = claimsPresented
+      self.transactionData = transactionData
+      self.registrationCheck = registrationCheck
+    }
+
+    /// True when the entry carries registration details (a registration, a party identifier, contacts or an
+    /// intermediary) that were not verified when the data was shared, as the Android wallet's
+    /// `hasUnverifiedRegistration`; an entry with no record counts as not verified.
+    public var hasUnverifiedRegistration: Bool {
+      let hasRegistrationDetails = registration != nil
+        || party.identifier != nil
+        || !party.contacts.isEmpty
+        || intermediary != nil
+      return hasRegistrationDetails && registrationCheck != .verified
     }
   }
 

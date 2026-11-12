@@ -25,7 +25,15 @@ public struct WrapExpandableListView<T: Sendable>: View {
   private let hideSensitiveContent: Bool
   private let hasHeader: Bool
   private let isLoading: Bool
+  private let expandsWhen: Bool
+  private let onExpand: ((String?, CGFloat) -> Void)?
 
+  @State private var height: CGFloat = .zero
+
+  /// `onExpand` runs each time the user opens a header card in the list, once it is laid out (see
+  /// `ExpandableCardView`). It passes the opened header's id, `nil` for the list's own header and the header's
+  /// `ListItemData.id` for a group inside the list, and the opened card's height. Each group carries its header's id
+  /// as its view identity, so a screen can scroll to it.
   public init(
     header: ListItemData? = nil,
     items: [ExpandableListItem<T>],
@@ -33,7 +41,9 @@ public struct WrapExpandableListView<T: Sendable>: View {
     hideSensitiveContent: Bool,
     hasHeader: Bool = true,
     isLoading: Bool = false,
-    onItemClick: ((ListItemData) -> Void)? = nil
+    expandsWhen: Bool = false,
+    onItemClick: ((ListItemData) -> Void)? = nil,
+    onExpand: ((String?, CGFloat) -> Void)? = nil
   ) {
     self.header = header
     self.items = items
@@ -41,7 +51,9 @@ public struct WrapExpandableListView<T: Sendable>: View {
     self.hideSensitiveContent = hideSensitiveContent
     self.hasHeader = hasHeader
     self.isLoading = isLoading
+    self.expandsWhen = expandsWhen
     self.onItemClick = onItemClick
+    self.onExpand = onExpand
   }
 
   public var body: some View {
@@ -51,7 +63,9 @@ public struct WrapExpandableListView<T: Sendable>: View {
           ExpandableCardView(
             backgroundColor: backgroundColor,
             header: header,
-            isLoading: isLoading
+            isLoading: isLoading,
+            expandsWhen: expandsWhen,
+            onExpand: onExpand.map { report in { report(nil, height) } }
           ) {
             contentList()
           }
@@ -60,6 +74,11 @@ public struct WrapExpandableListView<T: Sendable>: View {
         }
       }
       .shimmer(isLoading: isLoading)
+    }
+    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { newHeight in
+      if onExpand != nil {
+        height = newHeight
+      }
     }
   }
 
@@ -87,8 +106,12 @@ public struct WrapExpandableListView<T: Sendable>: View {
         items: nestedData.expanded,
         backgroundColor: backgroundColor,
         hideSensitiveContent: hideSensitiveContent,
-        onItemClick: onItemClick
+        onItemClick: onItemClick,
+        onExpand: onExpand.map { report in
+          { headerId, height in report(headerId ?? nestedData.collapsed.id, height) }
+        }
       )
+      .id(nestedData.collapsed.id)
     }
 
   }

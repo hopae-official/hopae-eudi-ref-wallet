@@ -14,15 +14,17 @@
  * governing permissions and limitations under the Licence.
  */
 import XCTest
+import os
 import logic_business
 import logic_core
+import logic_authentication
 @testable import feature_startup
 @testable import logic_test
 @testable import feature_test
 @testable import feature_common
 
 final class TestStartupInteractor: EudiTest {
-
+  
   var interactor: StartupInteractor!
   var walletKitController: MockWalletKitController!
   var quickPinInteractor: MockQuickPinInteractor!
@@ -30,7 +32,7 @@ final class TestStartupInteractor: EudiTest {
   var prefsController: MockPrefsController!
   var configLogic: MockConfigLogic!
   var introInteractor: MockIntroInteractor!
-
+  
   override func setUp() {
     self.walletKitController = MockWalletKitController()
     self.quickPinInteractor = MockQuickPinInteractor()
@@ -46,14 +48,14 @@ final class TestStartupInteractor: EudiTest {
       configLogic: configLogic,
       introInteractor: introInteractor
     )
-
+    
     stubConfigLogic()
     stubPrefsControllerSetValue()
     stubKeyChainClear()
     stubWalletKiControllerClearAllDocuments()
     stubIntroShouldNotShow()
   }
-
+  
   override func tearDown() {
     self.interactor = nil
     self.walletKitController = nil
@@ -63,17 +65,16 @@ final class TestStartupInteractor: EudiTest {
     self.configLogic = nil
     self.introInteractor = nil
   }
-
+  
   func testInitialize_WhenIsNotFirstBootAndPinIsNotSet_ThenReturnQuickPinAppRoute() async throws {
     // Given
     let expectedConfig = QuickPinUiConfig(flow: .setWithActivation)
-    let expectedPid = Constants.createEuPidModel()
-    let expectedMdl = Constants.createIsoMdlModel()
-    stubFetchDocuments(with: [expectedPid, expectedMdl])
+    stubHasStoredDocuments(false)
     stubHasPin(with: false)
     stubRunAtLeastOnce()
     // When
-    let route = await interactor.initialize(with: .zero)
+    let state = await interactor.initialize(with: .zero)
+    let route = try XCTUnwrap(successRoute(from: state))
     // Then
     switch route {
     case .featureCommonModule(let module):
@@ -87,20 +88,19 @@ final class TestStartupInteractor: EudiTest {
     default:
       XCTFail("Wrong route \(route)")
     }
-
+    
     verifyFirstBootStorageManipulation(count: 0)
   }
-
+  
   func testInitialize_WhenIsNotFirstBootAndPinIsSetAndHasIssuedDocuments_ThenReturnBiometricsAppRouteWithNavigationSuccessDashboard() async throws {
     // Given
     let expectedConfig = biometryConfig(with: true)
-    let expectedPid = Constants.createEuPidModel()
-    let expectedMdl = Constants.createIsoMdlModel()
-    stubFetchDocuments(with: [expectedPid, expectedMdl])
+    stubHasStoredDocuments(true)
     stubHasPin(with: true)
     stubRunAtLeastOnce()
     // When
-    let route = await interactor.initialize(with: .zero)
+    let state = await interactor.initialize(with: .zero)
+    let route = try XCTUnwrap(successRoute(from: state))
     // Then
     switch route {
     case .featureCommonModule(let module):
@@ -114,18 +114,19 @@ final class TestStartupInteractor: EudiTest {
     default:
       XCTFail("Wrong route \(route)")
     }
-
+    
     verifyFirstBootStorageManipulation(count: 0)
   }
-
+  
   func testInitialize_WhenIsNotFirstBootAndPinIsSetAndHasNoIssuedDocuments_ThenReturnBiometricsAppRouteWithNavigationSuccessAddDocument() async throws {
     // Given
     let expectedConfig = biometryConfig(with: false)
-    stubFetchDocuments(with: [])
+    stubHasStoredDocuments(false)
     stubHasPin(with: true)
     stubRunAtLeastOnce()
     // When
-    let route = await interactor.initialize(with: .zero)
+    let state = await interactor.initialize(with: .zero)
+    let route = try XCTUnwrap(successRoute(from: state))
     // Then
     switch route {
     case .featureCommonModule(let module):
@@ -139,20 +140,19 @@ final class TestStartupInteractor: EudiTest {
     default:
       XCTFail("Wrong route \(route)")
     }
-
+    
     verifyFirstBootStorageManipulation(count: 0)
   }
-
+  
   func testInitialize_WhenIsFirstBootAndPinIsNotSet_ThenClearDocumentStorageAndReturnQuickPinAppRoute() async throws {
     // Given
     let expectedConfig = QuickPinUiConfig(flow: .setWithActivation)
-    let expectedPid = Constants.createEuPidModel()
-    let expectedMdl = Constants.createIsoMdlModel()
-    stubFetchDocuments(with: [expectedPid, expectedMdl])
+    stubHasStoredDocuments(false)
     stubHasPin(with: false)
     stubRunAtLeastOnce(false)
     // When
-    let route = await interactor.initialize(with: .zero)
+    let state = await interactor.initialize(with: .zero)
+    let route = try XCTUnwrap(successRoute(from: state))
     // Then
     switch route {
     case .featureCommonModule(let module):
@@ -166,50 +166,206 @@ final class TestStartupInteractor: EudiTest {
     default:
       XCTFail("Wrong route \(route)")
     }
-
+    
     verifyFirstBootStorageManipulation(count: 1)
   }
 
-  func testInitialize_WhenIntroShouldShow_ThenReturnIntroRoute() async throws {
+  func testInitialize_WhenIntroShouldShowAndPinIsNotSet_ThenReturnIntroWithQuickPinContinuation() async throws {
     // Given
-    let expectedPid = Constants.createEuPidModel()
-    stubFetchDocuments(with: [expectedPid])
+    stubHasStoredDocuments(false)
+    stubHasPin(with: false)
+    stubRunAtLeastOnce()
+    stubIntroShouldShow()
+    // When
+    let state = await interactor.initialize(with: .zero)
+    let route = try XCTUnwrap(successRoute(from: state))
+    // Then
+    let receivedConfig = try XCTUnwrap(introConfig(from: route))
+    XCTAssertTrue(receivedConfig.showDismissOption)
+    guard case .featureCommonModule(let module) = receivedConfig.nextRoute, case .quickPin = module else {
+      return XCTFail("Wrong continuation route \(String(describing: receivedConfig.nextRoute))")
+    }
+    verifyFirstBootStorageManipulation(count: 0)
+  }
+
+  func testInitialize_WhenIntroShouldShowAndPinIsSet_ThenReturnIntroWithBiometryContinuation() async throws {
+    // Given
+    stubHasStoredDocuments(true)
     stubHasPin(with: true)
     stubRunAtLeastOnce()
     stubIntroShouldShow()
     // When
-    let route = await interactor.initialize(with: .zero)
+    let state = await interactor.initialize(with: .zero)
+    let route = try XCTUnwrap(successRoute(from: state))
     // Then
-    switch route {
-    case .featureStartupModule(let module):
-      if case .intro(let config) = module {
-        let receivedConfig = try XCTUnwrap(config as? IntroUiConfig)
-        XCTAssertTrue(receivedConfig.showDismissOption)
-        XCTAssertNotNil(receivedConfig.nextRoute)
-      } else {
-        XCTFail("Wrong route \(route)")
-      }
-    default:
-      XCTFail("Wrong route \(route)")
+    let receivedConfig = try XCTUnwrap(introConfig(from: route))
+    XCTAssertTrue(receivedConfig.showDismissOption)
+    guard case .featureCommonModule(let module) = receivedConfig.nextRoute, case .biometry = module else {
+      return XCTFail("Wrong continuation route \(String(describing: receivedConfig.nextRoute))")
     }
+  }
+
+  func testInitialize_WhenIntroShouldShowAndIsFirstBoot_ThenClearDocumentStorageAndReturnIntro() async throws {
+    // Given
+    stubHasStoredDocuments(false)
+    stubHasPin(with: false)
+    stubRunAtLeastOnce(false)
+    stubIntroShouldShow()
+    // When
+    let state = await interactor.initialize(with: .zero)
+    let route = try XCTUnwrap(successRoute(from: state))
+    // Then
+    XCTAssertNotNil(introConfig(from: route))
+    verifyFirstBootStorageManipulation(count: 1)
+  }
+
+  func testInitialize_WhenPinIsNotSetAndHasDocuments_ThenFailsWithPinNotFound() async {
+    stubHasStoredDocuments(true)
+    stubHasPin(with: false)
+    stubRunAtLeastOnce()
+
+    let state = await interactor.initialize(with: .zero)
+
+    XCTAssertEqual(failureError(from: state) as? AuthenticationError, .pinNotFound)
+  }
+
+  func testInitialize_WhenPinRecordCannotBeRead_ThenFailsWithTheReadError() async {
+    stubHasStoredDocuments(false)
+    stub(quickPinInteractor) { mock in
+      when(mock.hasPin()).thenThrow(KeyChainError.readFailed(status: errSecInteractionNotAllowed))
+    }
+    stubRunAtLeastOnce()
+
+    let state = await interactor.initialize(with: .zero)
+
+    XCTAssertEqual(failureError(from: state) as? KeyChainError, .readFailed(status: errSecInteractionNotAllowed))
+  }
+
+  func testInitialize_WhenPinIsNotSetAndDocumentsCannotBeChecked_ThenFailsWithTheCheckError() async {
+    stubDocumentsCheckFailure()
+    stubHasPin(with: false)
+    stubRunAtLeastOnce()
+
+    let state = await interactor.initialize(with: .zero)
+
+    XCTAssertEqual(failureError(from: state) as? KeyChainError, Self.documentsCheckError)
+  }
+
+  func testInitialize_WhenFirstBootWipeFailsAndDocumentsRemain_ThenFailsAndWipesAgainNextTime() async {
+    stubHasStoredDocuments(true)
+    stubHasPin(with: false)
+    stubRunAtLeastOnce(false)
+    stubKeyChainClear(success: false)
+
+    let state = await interactor.initialize(with: .zero)
+
+    XCTAssertEqual(failureError(from: state) as? AuthenticationError, .pinNotFound)
+    verify(prefsController, never()).setValue(any(), forKey: Prefs.Key.runAtLeastOnce)
+  }
+
+  func testInitialize_WhenIntroShouldShowAndPinCannotBeRead_ThenFailsWithoutIntro() async {
+    stubHasStoredDocuments(false)
+    stub(quickPinInteractor) { mock in
+      when(mock.hasPin()).thenThrow(KeyChainError.readFailed(status: errSecInteractionNotAllowed))
+    }
+    stubRunAtLeastOnce()
+    stubIntroShouldShow()
+
+    let state = await interactor.initialize(with: .zero)
+
+    XCTAssertEqual(failureError(from: state) as? KeyChainError, .readFailed(status: errSecInteractionNotAllowed))
+  }
+
+  func testInitialize_WhenPinIsSetAndDocumentsCannotBeChecked_ThenReturnBiometricsAppRoute() async throws {
+    stubDocumentsCheckFailure()
+    stubHasPin(with: true)
+    stubRunAtLeastOnce()
+
+    let state = await interactor.initialize(with: .zero)
+
+    let route = try XCTUnwrap(successRoute(from: state))
+    guard case .featureCommonModule(let module) = route, case .biometry(let config) = module else {
+      return XCTFail("Wrong route \(route)")
+    }
+    XCTAssertEqual(config as? UIConfig.Biometry, biometryConfig(with: false))
+  }
+
+  func testInitialize_WhenFirstBootWipesTheDocuments_ThenChecksForDocumentsAfterTheWipe() async throws {
+    let storage = RecordingWipe()
+    stubHasPin(with: false)
+    stubRunAtLeastOnce(false)
+    stub(walletKitController) { mock in
+      when(mock.clearAllDocuments()).then { storage.wipe() }
+      when(mock.hasStoredDocuments()).then { storage.hasDocuments }
+    }
+
+    let state = await interactor.initialize(with: .zero)
+
+    let route = try XCTUnwrap(successRoute(from: state))
+    guard case .featureCommonModule(let module) = route, case .quickPin = module else {
+      return XCTFail("Wrong route \(route)")
+    }
+  }
+
+  func testInitialize_WhenPinIsSetAndHasDocuments_ThenLoadsNoDocumentBeforeLogin() async {
+    stubHasStoredDocuments(true)
+    stubHasPin(with: true)
+    stubRunAtLeastOnce()
+
+    _ = await interactor.initialize(with: .zero)
+
+    verify(walletKitController).hasStoredDocuments()
+    verify(walletKitController, never()).loadDocuments()
+    verify(walletKitController, never()).fetchAllDocuments()
   }
 }
 
 private extension TestStartupInteractor {
 
-  func stubFetchDocuments(with documents: [any DocClaimsDecodable]) {
-    stub(walletKitController) { mock in
-      when(mock.loadDocuments()).thenDoNothing()
-      when(mock.fetchAllDocuments()).thenReturn(documents)
+  /// A document store that holds documents until the first-boot wipe clears it.
+  final class RecordingWipe: Sendable {
+
+    private let isWiped = OSAllocatedUnfairLock(initialState: false)
+
+    var hasDocuments: Bool {
+      isWiped.withLock { !$0 }
+    }
+
+    func wipe() {
+      isWiped.withLock { $0 = true }
     }
   }
 
+  static let documentsCheckError = KeyChainError.readFailed(status: errSecDecode)
+
+  func successRoute(from state: StartupPartialState) -> AppRoute? {
+    guard case .success(let route) = state else { return nil }
+    return route
+  }
+
+  func failureError(from state: StartupPartialState) -> Error? {
+    guard case .failure(let error) = state else { return nil }
+    return error
+  }
+
+  func stubDocumentsCheckFailure() {
+    stub(walletKitController) { mock in
+      when(mock.hasStoredDocuments()).thenThrow(Self.documentsCheckError)
+    }
+  }
+
+  func stubHasStoredDocuments(_ hasDocuments: Bool) {
+    stub(walletKitController) { mock in
+      when(mock.hasStoredDocuments()).thenReturn(hasDocuments)
+    }
+  }
+  
   func stubHasPin(with hasPin: Bool) {
     stub(quickPinInteractor) { mock in
       when(mock.hasPin()).thenReturn(hasPin)
     }
   }
-
+  
   func biometryConfig(with hasDocuments: Bool) -> UIConfig.Biometry {
     return UIConfig.Biometry(
       navigationTitle: .enterYourPin,
@@ -227,43 +383,25 @@ private extension TestStartupInteractor {
       displayNavigationBar: true
     )
   }
-
+  
   func stubPrefsControllerSetValue() {
     stub(prefsController) { mock in
       when(mock.setValue(any(), forKey: any())).thenDoNothing()
     }
   }
-
+  
   func stubConfigLogic() {
     stub(configLogic) { mock in
       when(mock.forcePidActivation.get).thenReturn(true)
     }
   }
-
+  
   func stubRunAtLeastOnce(_ atLeastOnce: Bool = true) {
     stub(prefsController) { mock in
       when(mock.getBool(forKey: Prefs.Key.runAtLeastOnce)).thenReturn(atLeastOnce)
     }
   }
-
-  func stubKeyChainClear(success: Bool = true) {
-    stub(keyChainController) { mock in
-      when(mock.clear()).thenReturn(success)
-    }
-  }
-
-  func stubWalletKiControllerClearAllDocuments() {
-    stub(walletKitController) { mock in
-      when(mock.clearAllDocuments()).thenDoNothing()
-    }
-  }
-
-  func verifyFirstBootStorageManipulation(count: Int) {
-    verify(prefsController, times(count)).setValue(any(), forKey: Prefs.Key.runAtLeastOnce)
-    verify(keyChainController, times(count)).clear()
-    verify(walletKitController, times(count)).clearAllDocuments()
-  }
-
+  
   func stubIntroShouldNotShow() {
     stub(introInteractor) { mock in
       when(mock.shouldShowIntro()).thenReturn(false)
@@ -274,5 +412,32 @@ private extension TestStartupInteractor {
     stub(introInteractor) { mock in
       when(mock.shouldShowIntro()).thenReturn(true)
     }
+  }
+
+  func introConfig(from route: AppRoute) -> IntroUiConfig? {
+    guard case .featureStartupModule(let module) = route,
+          case .intro(let config) = module
+    else {
+      return nil
+    }
+    return config as? IntroUiConfig
+  }
+
+  func stubKeyChainClear(success: Bool = true) {
+    stub(keyChainController) { mock in
+      when(mock.clear()).thenReturn(success)
+    }
+  }
+  
+  func stubWalletKiControllerClearAllDocuments() {
+    stub(walletKitController) { mock in
+      when(mock.clearAllDocuments()).thenDoNothing()
+    }
+  }
+  
+  func verifyFirstBootStorageManipulation(count: Int) {
+    verify(prefsController, times(count)).setValue(any(), forKey: Prefs.Key.runAtLeastOnce)
+    verify(keyChainController, times(count)).clear()
+    verify(walletKitController, times(count)).clearAllDocuments()
   }
 }
