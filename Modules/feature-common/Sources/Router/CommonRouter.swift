@@ -55,10 +55,17 @@ public final class CommonRouter {
       GenericSuccessView(
         with: .init(
           config: config,
+          router: host
+        )
+      )
+    case .trustMark(let config):
+      TrustMarkView(
+        with: .init(
           router: host,
-          deepLinkController: DIGraph.shared.resolver.force(
-            DeepLinkController.self
-          )
+          interactor: DIGraph.shared.resolver.force(
+            TrustMarkInteractor.self
+          ),
+          config: config
         )
       )
     }

@@ -28,6 +28,8 @@ public struct RequestDataUiModel: Identifiable, Equatable, Sendable, Routable {
   public var id: String
 
   public let section: PresentationListItemSection
+  /// The ids of the claims that hold a picture of the holder (`ConfigUiLogic.userImageClaimKeys`).
+  public let userImageItemIds: Set<String>
 
   public var log: String {
     "id: \(section.id), title: \(section.title)"
@@ -35,10 +37,26 @@ public struct RequestDataUiModel: Identifiable, Equatable, Sendable, Routable {
 
   public init(
     id: String = UUID().uuidString,
-    section: PresentationListItemSection
+    section: PresentationListItemSection,
+    userImageItemIds: Set<String> = []
   ) {
     self.id = id
     self.section = section
+    self.userImageItemIds = userImageItemIds
+  }
+}
+
+@Copyable
+public struct RequestCombinationUiModel: Equatable, Sendable {
+  public let documents: [RequestDataUiModel]
+  public let transactionData: RequestTransactionDataUiModel?
+
+  public init(
+    documents: [RequestDataUiModel],
+    transactionData: RequestTransactionDataUiModel? = nil
+  ) {
+    self.documents = documents
+    self.transactionData = transactionData
   }
 }
 
@@ -184,13 +202,16 @@ public extension Array where Element == RequestDataUiModel {
       currentList.forEach {
         switch $0 {
         case .single(let item):
+          let row = PresentationExpandableListItem.single(
+            item.copy(collapsed: item.collapsed.copy(supportingText: nil))
+          )
           switch item.collapsed.trailingContent {
           case .checkbox(_, let isSelected, _):
             if isSelected {
-              newList.append($0)
+              newList.append(row)
             }
           default:
-            newList.append($0)
+            newList.append(row)
           }
         case .nested(let item):
           newList.append($0)
@@ -294,6 +315,35 @@ public extension Array where Element == RequestDataUiModel {
       return false
     }
   }
+
+  /// True when a document of the option requests a picture of the holder, such as the portrait.
+  func requestsUserImage() -> Bool {
+    contains { !$0.userImageItemIds.isEmpty }
+  }
+
+  /// True when Share would disclose a picture of the holder: its row is selected, or has no checkbox because the
+  /// document's claims are disclosed as a whole.
+  func sharesUserImage() -> Bool {
+    contains { model in
+      model.section.listItems.contains { $0.disclosesAnyOf(model.userImageItemIds) }
+    }
+  }
+}
+
+private extension ExpandableListItem where T == DocumentElementClaim {
+  /// True when a row among `itemIds` would be disclosed: selected, or without a checkbox.
+  func disclosesAnyOf(_ itemIds: Set<String>) -> Bool {
+    switch self {
+    case .nested(let item):
+      return item.expanded.contains { $0.disclosesAnyOf(itemIds) }
+    case .single(let item):
+      guard let id = item.domainModel?.id, itemIds.contains(id) else { return false }
+      if case .checkbox(_, let isSelected, _) = item.collapsed.trailingContent {
+        return isSelected
+      }
+      return true
+    }
+  }
 }
 
 public extension RequestDataUiModel {
@@ -353,7 +403,9 @@ public extension Array where Element == DocElements {
   ///   (presentation, where selection happens at the combination level).
   func toUiModels(
     with walletKitController: WalletKitController,
-    claimsAreSelectable: Bool = true
+    claimsAreSelectable: Bool = true,
+    userImageClaimKeys: Set<String> = [],
+    overaskedPaths: [String: Set<[String]>] = [:]
   ) -> [RequestDataUiModel] {
     self.compactMap { element in
 
@@ -410,12 +462,18 @@ public extension Array where Element == DocElements {
         return nil
       }
 
+      let overaskedPathsForDocument = overaskedPaths[element.docId] ?? []
+
       return .init(
         section: .init(
           id: element.docId,
           title: title,
-          listItems: dataRows.toListItems(claimsAreSelectable: claimsAreSelectable)
-        )
+          listItems: dataRows.toListItems(
+            claimsAreSelectable: claimsAreSelectable,
+            overaskedPaths: overaskedPathsForDocument
+          )
+        ),
+        userImageItemIds: dataFields.userImageItemIds(userImageClaimKeys: userImageClaimKeys)
       )
     }
   }
@@ -448,25 +506,59 @@ private extension Array where Element == DocClaim {
 }
 
 private extension Array where Element == DocumentElementClaim {
-  func toListItems(claimsAreSelectable: Bool) -> [PresentationExpandableListItem] {
-    self.compactMap { $0.toListItem(claimsAreSelectable: claimsAreSelectable) }
+
+  /// The ids of the claims, in groups too, whose last path element is one of `userImageClaimKeys`.
+  func userImageItemIds(userImageClaimKeys: Set<String>) -> Set<String> {
+    reduce(into: Set<String>()) { ids, claim in
+      switch claim {
+      case .group(_, _, let items):
+        ids.formUnion(items.userImageItemIds(userImageClaimKeys: userImageClaimKeys))
+      case .primitive(let id, _, _, _, let path, _, _, _):
+        if let key = path.last, userImageClaimKeys.contains(key) {
+          ids.insert(id)
+        }
+      }
+    }
+  }
+
+  func toListItems(
+    claimsAreSelectable: Bool,
+    overaskedPaths: Set<[String]>
+  ) -> [PresentationExpandableListItem] {
+    self.compactMap {
+      $0.toListItem(claimsAreSelectable: claimsAreSelectable, overaskedPaths: overaskedPaths)
+    }
   }
 }
 
 private extension DocumentElementClaim {
-  func toListItem(claimsAreSelectable: Bool) -> PresentationExpandableListItem? {
-    return self.toExpandableListItem(claimsAreSelectable: claimsAreSelectable)
+  func toListItem(
+    claimsAreSelectable: Bool,
+    overaskedPaths: Set<[String]>
+  ) -> PresentationExpandableListItem? {
+    return self.toExpandableListItem(
+      claimsAreSelectable: claimsAreSelectable,
+      overaskedPaths: overaskedPaths
+    )
   }
 }
 
 private extension DocumentElementClaim {
-  func toExpandableListItem(claimsAreSelectable: Bool) -> PresentationExpandableListItem? {
+  func toExpandableListItem(
+    claimsAreSelectable: Bool,
+    overaskedPaths: Set<[String]>
+  ) -> PresentationExpandableListItem? {
     switch self {
     case .group(let id, let title, let items):
       return .nested(
         .init(
           collapsed: .init(groupId: id, mainContent: .text(.custom(title))),
-          expanded: items.compactMap { $0.toExpandableListItem(claimsAreSelectable: claimsAreSelectable) },
+          expanded: items.compactMap {
+            $0.toExpandableListItem(
+              claimsAreSelectable: claimsAreSelectable,
+              overaskedPaths: overaskedPaths
+            )
+          },
           isExpanded: false
         )
       )
@@ -475,13 +567,12 @@ private extension DocumentElementClaim {
       let title,
       _,
       _,
-      _,
+      let claimPath,
       _,
       let value,
       let status
     ):
-      // When claims are not selectable (presentation), rows are read-only: no checkbox is shown
-      // and the entire combination is disclosed.
+      let isOverasked = overaskedPaths.contains(claimPath)
       let trailingContent: TrailingContent = claimsAreSelectable
         ? .checkbox(!status.isRequired && status.isAvailable, status.isAvailable, { _ in })
         : .empty
@@ -493,6 +584,8 @@ private extension DocumentElementClaim {
               groupId: id,
               mainContent: .text(.custom(value)),
               overlineText: .custom(title),
+              supportingText: isOverasked ? .notRegisteredData : nil,
+              supportingTextColor: isOverasked ? Theme.shared.color.warning : Theme.shared.color.secondaryLabel,
               isEnable: !status.isRequired,
               trailingContent: trailingContent
             ),
@@ -507,6 +600,8 @@ private extension DocumentElementClaim {
                 groupId: id,
                 mainContent: .image(image),
                 overlineText: .custom(title),
+                supportingText: isOverasked ? .notRegisteredData : nil,
+                supportingTextColor: isOverasked ? Theme.shared.color.warning : Theme.shared.color.secondaryLabel,
                 isEnable: !status.isRequired,
                 trailingContent: trailingContent
               ),
@@ -519,6 +614,8 @@ private extension DocumentElementClaim {
               collapsed: .init(
                 groupId: id,
                 mainContent: .text(.custom(title)),
+                supportingText: isOverasked ? .notRegisteredData : nil,
+                supportingTextColor: isOverasked ? Theme.shared.color.warning : Theme.shared.color.secondaryLabel,
                 leadingContent: .remoteImage(image: image),
                 isEnable: !status.isRequired,
                 trailingContent: trailingContent

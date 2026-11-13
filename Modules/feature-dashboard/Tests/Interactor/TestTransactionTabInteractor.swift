@@ -35,6 +35,7 @@ final class TestTransactionTabInteractor: EudiTest {
       walletKitController: walletKitController,
       filterValidator: filterValidator
     )
+    stubTransactionLogRevision("revision-0")
   }
   
   override func tearDown() {
@@ -93,6 +94,37 @@ final class TestTransactionTabInteractor: EudiTest {
     }
   }
   
+  func testFetchTransactions_WhenTheHistoryDidNotChange_ThenDoesNotReadItAgain() async throws {
+    stubFetchTransactions(with: [Constants.eudiRemoteVerifierMock])
+
+    _ = try await interactor.fetchTransactions()
+    let state = try await interactor.fetchTransactions()
+
+    guard case .success = state else { return XCTFail("Wrong state \(state)") }
+    verify(walletKitController, times(1)).fetchTransactionLogs()
+  }
+
+  func testFetchTransactions_WhenTheLastReadFailed_ThenReadsAgain() async throws {
+    stubFetchTransactionsWithError()
+    _ = try? await interactor.fetchTransactions()
+    stubFetchTransactions(with: [Constants.eudiRemoteVerifierMock])
+
+    let state = try await interactor.fetchTransactions()
+
+    guard case .success = state else { return XCTFail("Wrong state \(state)") }
+    verify(walletKitController, times(2)).fetchTransactionLogs()
+  }
+
+  func testFetchTransactions_WhenTheHistoryChanged_ThenReadsItAgain() async throws {
+    stubFetchTransactions(with: [Constants.eudiRemoteVerifierMock])
+
+    _ = try await interactor.fetchTransactions()
+    stubTransactionLogRevision("revision-1")
+    _ = try await interactor.fetchTransactions()
+
+    verify(walletKitController, times(2)).fetchTransactionLogs()
+  }
+
   func testInitializeFilters_WhenInitializedWithFilterableList_ThenInitializesFilterValidator() async throws {
     // Given
     let filterableList = Self.mockFilterableList
@@ -270,31 +302,28 @@ final class TestTransactionTabInteractor: EudiTest {
 
   func testInitializeFilters_WhenTransactionsHaveRelyingParty_ThenRelyingPartyGroupIsPopulated() async {
     // Given: transactions with two distinct relying parties and one with no
-    // relying-party name. addDynamicFilters → addRelyingPartyName should
-    // produce a FILTER_BY_RELYING_PARY_NAME group containing the "none" item
+    // party name. addDynamicFilters → addPartyNames should
+    // produce a FILTER_BY_PARTY_NAME group containing the "none" item
     // plus two named items, sorted alphabetically.
     let txUiA = TransactionTabUIModel(
       id: "1",
       name: "Verifier A",
       status: .completed,
-      transactionDate: "1 Jan 2026 10:00",
-      transactionCategory: .category(for: "1 Jan 2026 10:00"),
+      transactionDate: Date(timeIntervalSince1970: 1_767_261_600),
       transactionType: .presentation
     )
     let txUiB = TransactionTabUIModel(
       id: "2",
       name: "Verifier B",
       status: .completed,
-      transactionDate: "1 Jan 2026 11:00",
-      transactionCategory: .category(for: "1 Jan 2026 11:00"),
+      transactionDate: Date(timeIntervalSince1970: 1_767_265_200),
       transactionType: .presentation
     )
     let txUiNone = TransactionTabUIModel(
       id: "3",
       name: "",
       status: .completed,
-      transactionDate: "1 Jan 2026 12:00",
-      transactionCategory: .category(for: "1 Jan 2026 12:00"),
+      transactionDate: Date(timeIntervalSince1970: 1_767_268_800),
       transactionType: .presentation
     )
     let filterable = FilterableList(items: [
@@ -302,21 +331,21 @@ final class TestTransactionTabInteractor: EudiTest {
         payload: txUiA,
         attributes: TransactionFilterableAttributes(
           sortingKey: "verifier a", searchTags: ["a"],
-          relyingPartyName: "Verifier A"
+          partyName: "Verifier A"
         )
       ),
       FilterableItem(
         payload: txUiB,
         attributes: TransactionFilterableAttributes(
           sortingKey: "verifier b", searchTags: ["b"],
-          relyingPartyName: "Verifier B"
+          partyName: "Verifier B"
         )
       ),
       FilterableItem(
         payload: txUiNone,
         attributes: TransactionFilterableAttributes(
           sortingKey: "none", searchTags: ["none"],
-          relyingPartyName: nil
+          partyName: nil
         )
       )
     ])
@@ -337,12 +366,12 @@ final class TestTransactionTabInteractor: EudiTest {
     )
 
     // Then
-    let relyingPartyGroup = capturedFilters?.filterGroups.first {
-      $0.id == FilterIds.FILTER_BY_RELYING_PARY_NAME
+    let partyGroup = capturedFilters?.filterGroups.first {
+      $0.id == FilterIds.FILTER_BY_PARTY_NAME
     }
-    XCTAssertNotNil(relyingPartyGroup)
-    let filterIds = relyingPartyGroup?.filters.map(\.id) ?? []
-    XCTAssertTrue(filterIds.contains(FilterIds.FILTER_BY_RELYING_PARTY_NONE))
+    XCTAssertNotNil(partyGroup)
+    let filterIds = partyGroup?.filters.map(\.id) ?? []
+    XCTAssertTrue(filterIds.contains(FilterIds.FILTER_BY_PARTY_NONE))
     XCTAssertTrue(filterIds.contains("Verifier A"))
     XCTAssertTrue(filterIds.contains("Verifier B"))
   }
@@ -411,8 +440,7 @@ private extension TestTransactionTabInteractor {
       id: "transaction-id",
       name: "EUDI Remote Verifier",
       status: .completed,
-      transactionDate: "15 May 2025 10:30 am",
-      transactionCategory: .category(for: "15 May 2025 10:30 am"),
+      transactionDate: Date(timeIntervalSince1970: 1_747_305_000),
       transactionType: .presentation
     )
   
@@ -430,6 +458,12 @@ private extension TestTransactionTabInteractor {
     ]
   )
   
+  func stubTransactionLogRevision(_ revision: String) {
+    stub(walletKitController) { mock in
+      when(mock.fetchTransactionLogRevision()).thenReturn(revision)
+    }
+  }
+
   func stubFetchTransactionsWithError() {
     stub(walletKitController) { mock in
       when(mock.fetchTransactionLogs())
@@ -437,7 +471,7 @@ private extension TestTransactionTabInteractor {
     }
   }
   
-  func stubFetchTransactions(with transactions: [TransactionLogItem]) {
+  func stubFetchTransactions(with transactions: [TransactionLogDomain]) {
     stub(walletKitController) { mock in
       when(mock.fetchTransactionLogs())
         .thenReturn(transactions)

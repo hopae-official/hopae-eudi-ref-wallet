@@ -21,25 +21,54 @@ import XCTest
 @testable import feature_common
 @testable import feature_issuance
 import OpenID4VCI
+import EudiWalletKit
 
 final class TestDocumentOfferInteractor: EudiTest {
   
   var interactor: DocumentOfferInteractor!
   var walletKitController: MockWalletKitController!
   var configLogic: MockConfigLogic!
+  var sessionController: MockSessionController!
   
   override func setUp() {
     super.setUp()
     self.walletKitController = MockWalletKitController()
+    stub(walletKitController) { mock in
+      when(mock.issuerLogoOrigins()).thenReturn(IssuerLogoOrigins(logoOriginsByIssuer: [:]))
+    }
     self.configLogic = MockConfigLogic()
+    stub(walletKitController) { mock in
+      // The offer carries the issuer's registration; tests that need a different scenario
+      // override this.
+      when(mock.getIssuerRegistration(for: any())).thenReturn(
+        .verified(
+          details: RegistrationDetails(
+            tradeName: "issuer",
+            uniqueId: "issuer",
+            logoUrl: nil,
+            intendedUse: nil,
+            privacyPolicyUrl: nil,
+            serviceDescription: nil
+          )
+        )
+      )
+    }
+
+    self.sessionController = MockSessionController()
+    stub(sessionController) { mock in
+      when(mock.beginExternalFlow()).thenReturn(0)
+      when(mock.endExternalFlow(startedIn: any())).thenDoNothing()
+    }
     self.interactor = DocumentOfferInteractorImpl(
       walletController: walletKitController,
-      configLogic: configLogic
+      configLogic: configLogic,
+      sessionController: sessionController
     )
     stubConfigLogic()
   }
   
   override func tearDown() {
+    self.sessionController = nil
     self.interactor = nil
     self.walletKitController = nil
     self.configLogic = nil
@@ -325,6 +354,109 @@ final class TestDocumentOfferInteractor: EudiTest {
     }
   }
   
+  func testIssueDocuments_WhenWalletThrowsTrustError_ThenReturnsIssuerNotTrusted() async {
+    // Given
+    let config = UIConfig.TwoWayNavigationType.push(
+      .featureCommonModule(
+        .genericSuccess(config: UIConfig.Success(
+          title: .init(value: .addDocumentTitle),
+          subtitle: .addDocumentTitle,
+          buttons: [],
+          visualKind: UIConfig.Success.VisualKind.defaultIcon)
+        )
+      )
+    )
+
+    let uri = "uri"
+    let txCodeValue = "txCodeValue"
+
+    stub(walletKitController) { mock in
+      mock.issueDocumentsByOfferUrl(
+        offerUri: uri,
+        docTypes: any(),
+        txCodeValue: txCodeValue
+      )
+      .thenThrow(WalletError(description: "issuer not trusted", code: .trustError))
+    }
+
+    // When
+    let result = await interactor.issueDocuments(
+      with: uri,
+      issuerName: "issuerName",
+      docOffers: [],
+      successNavigation: config,
+      txCodeValue: txCodeValue
+    )
+
+    // Then
+    switch result {
+    case .issuerNotTrusted:
+      XCTAssertTrue(true)
+    default:
+      XCTFail("Expected .issuerNotTrusted but got \(result)")
+    }
+
+    verify(sessionController).beginExternalFlow()
+    verify(sessionController).endExternalFlow(startedIn: any())
+  }
+
+  func testResumeDynamicIssuance_WhenWalletThrowsTrustError_ThenReturnsIssuerNotTrusted() async {
+    // Given
+    let config = IssuanceCodeUiConfig(
+      offerUri: "",
+      issuerName: "Issuer Name",
+      txCodeLength: 6,
+      docOffers: [],
+      successNavigation: .popTo(
+        .featureIssuanceModule(
+          .credentialOfferRequest(config: NoConfig())
+        )
+      ),
+      navigationCancelType: .pop
+    )
+
+    let document = Document(
+      id: "doc-id",
+      docType: "type",
+      docDataFormat: .sdjwt,
+      data: Data(),
+      docKeyInfo: nil,
+      createdAt: Date(),
+      metadata: nil,
+      displayName: "My Document",
+      status: .issued
+    )
+
+    let mockPendingData = DynamicIssuancePendingData(
+      pendingDoc: document,
+      url: URL(filePath: "someURL")!
+    )
+
+    stub(walletKitController) { mock in
+      when(mock.getDynamicIssuancePendingData()).thenReturn(mockPendingData)
+
+      when(mock.resumePendingIssuance(
+        pendingDoc: any(),
+        webUrl: any()
+      ))
+      .thenThrow(WalletError(description: "issuer not trusted", code: .trustError))
+    }
+
+    // When
+    let result = await interactor.resumeDynamicIssuance(
+      issuerName: config.issuerName,
+      successNavigation: config.successNavigation
+    )
+
+    // Then
+    switch result {
+    case .issuerNotTrusted:
+      XCTAssertTrue(true)
+    default:
+      XCTFail("Expected .issuerNotTrusted but got \(result)")
+    }
+  }
+
   func testIssueDocuments_WhenIssueDocumentsByOfferUrl_ThenReturnFailure() async {
     // Given
     let config = UIConfig.TwoWayNavigationType.push(
@@ -392,7 +524,7 @@ final class TestDocumentOfferInteractor: EudiTest {
         docTypes: any(),
         txCodeValue: txCodeValue
       )
-      .thenReturn([])
+      .thenReturn(IssuanceResult(documents: [], issuerRegistration: nil))
     }
     
     // When
@@ -447,7 +579,7 @@ final class TestDocumentOfferInteractor: EudiTest {
         docTypes: any(),
         txCodeValue: txCodeValue
       )
-      .thenReturn([document])
+      .thenReturn(IssuanceResult(documents: [document], issuerRegistration: nil))
     }
     
     // When
@@ -502,7 +634,7 @@ final class TestDocumentOfferInteractor: EudiTest {
         docTypes: any(),
         txCodeValue: txCodeValue
       )
-      .thenReturn([document])
+      .thenReturn(IssuanceResult(documents: [document], issuerRegistration: nil))
       
       when(mock.fetchDocuments(with: any())).thenReturn([Constants.createEuPidModel()])
     }
@@ -575,7 +707,7 @@ final class TestDocumentOfferInteractor: EudiTest {
         docTypes: docOffers,
         txCodeValue: txCodeValue
       )
-      .thenReturn([document])
+      .thenReturn(IssuanceResult(documents: [document], issuerRegistration: nil))
       
       when(mock.fetchDocuments(with: any())).thenReturn([Constants.createEuPidModel()])
     }
@@ -644,10 +776,11 @@ final class TestDocumentOfferInteractor: EudiTest {
       txCodeSpec: TxCode(inputMode: .text, length: 6, description: "description")
     )
     
-    let offerUI = issuanceModel.transformToDocumentOfferUi()
+    let offerUI = issuanceModel.transformToDocumentOfferUi(allowedLogoOrigins: ["https://logo.com"])
     
     XCTAssertEqual(offerUI.issuerName, "Issuer")
     XCTAssertEqual(offerUI.issuerLogo?.absoluteString, "https://logo.com/logo.png")
+    XCTAssertNil(issuanceModel.transformToDocumentOfferUi(allowedLogoOrigins: ["https://issuer.example"]).issuerLogo)
     XCTAssertEqual(offerUI.uiOffers.count, 1)
     XCTAssertEqual(offerUI.uiOffers.first?.documentName, "Display Name")
     XCTAssertEqual(offerUI.txCode?.isRequired, true)
@@ -671,6 +804,58 @@ final class TestDocumentOfferInteractor: EudiTest {
     XCTAssertEqual(mock.docOffers.count, 0)
   }
   
+  func testProcessOfferRequest_WhenTheIssuerMetadataIsNotTrusted_ThenReturnsIssuerNotTrusted() async {
+    // Given
+    let uri = "uri"
+    let error = WalletError(
+      description: "Unable to resolve credential offer: Credential issuer metadata is not issued by a trusted issuer",
+      code: .offerResolutionFailed,
+      innerError: CredentialIssuerMetadataError.invalidIssuerTrust
+    )
+    stub(walletKitController) { mock in
+      mock.resolveOfferUrlDocTypes(offerUri: uri).thenThrow(error)
+      mock.fetchIssuedDocuments(with: any()).thenReturn([Constants.createEuPidModel()])
+    }
+
+    // When
+    let result = await interactor.processOfferRequest(with: uri)
+
+    // Then
+    switch result {
+    case .issuerNotTrusted:
+      XCTAssertTrue(true)
+    default:
+      XCTFail("Expected .issuerNotTrusted, got \(result)")
+    }
+  }
+
+  func testProcessOfferRequest_WhenTheIssuerIsUnreachable_ThenReturnsFailure() async {
+    // Given
+    let uri = "uri"
+    let error = WalletError(
+      description: "Unable to resolve credential offer",
+      code: .offerResolutionFailed,
+      innerError: CredentialIssuerMetadataError.unableToFetchCredentialIssuerMetadata(
+        cause: URLError(.notConnectedToInternet)
+      )
+    )
+    stub(walletKitController) { mock in
+      mock.resolveOfferUrlDocTypes(offerUri: uri).thenThrow(error)
+      mock.fetchIssuedDocuments(with: any()).thenReturn([Constants.createEuPidModel()])
+    }
+
+    // When
+    let result = await interactor.processOfferRequest(with: uri)
+
+    // Then
+    switch result {
+    case .failure:
+      XCTAssertTrue(true)
+    default:
+      XCTFail("Expected failure, got \(result)")
+    }
+  }
+
   func testProcessOfferRequest_WhenTxCodeLengthOutOfRange_ThenReturnsTransactionCodeFormatFailure() async {
     // Given: an offer with txCodeSpec.length outside the 4...6 range hits the
     // failure branch in processOfferRequest (lines 59-63).
@@ -699,6 +884,88 @@ final class TestDocumentOfferInteractor: EudiTest {
       }
     default:
       XCTFail("Expected failure, got \(result)")
+    }
+  }
+
+  func testProcessOfferRequest_WhenTxCodeHasNoLength_ThenReturnsTransactionCodeFormatFailure() async {
+    let uri = "uri"
+    let offer = OfferedIssuanceModel(
+      issuerName: "issuerName",
+      issuerLogoUrl: "https://logo",
+      docModels: [],
+      txCodeSpec: TxCode(inputMode: .numeric, length: nil, description: "")
+    )
+    stub(walletKitController) { mock in
+      mock.resolveOfferUrlDocTypes(offerUri: uri).thenReturn(offer)
+      mock.fetchIssuedDocuments(with: any()).thenReturn([Constants.createEuPidModel()])
+    }
+
+    let result = await interactor.processOfferRequest(with: uri)
+
+    guard case .failure(let error) = result, case .transactionCodeFormat = error as? WalletCoreError else {
+      return XCTFail("Expected .transactionCodeFormat, got \(result)")
+    }
+  }
+
+  func testProcessOfferRequest_WhenTxCodeIsLongerThanSix_ThenReturnsTransactionCodeFormatFailure() async {
+    let uri = "uri"
+    let offer = OfferedIssuanceModel(
+      issuerName: "issuerName",
+      issuerLogoUrl: "https://logo",
+      docModels: [],
+      txCodeSpec: TxCode(inputMode: .numeric, length: 7, description: "")
+    )
+    stub(walletKitController) { mock in
+      mock.resolveOfferUrlDocTypes(offerUri: uri).thenReturn(offer)
+      mock.fetchIssuedDocuments(with: any()).thenReturn([Constants.createEuPidModel()])
+    }
+
+    let result = await interactor.processOfferRequest(with: uri)
+
+    guard case .failure(let error) = result, case .transactionCodeFormat = error as? WalletCoreError else {
+      return XCTFail("Expected .transactionCodeFormat, got \(result)")
+    }
+  }
+
+  func testProcessOfferRequest_WhenTxCodeHasSixDigits_ThenIsNotRefusedForTheCode() async {
+    let uri = "uri"
+    let offer = OfferedIssuanceModel(
+      issuerName: "issuerName",
+      issuerLogoUrl: "https://logo",
+      docModels: [],
+      txCodeSpec: TxCode(inputMode: .numeric, length: 6, description: "")
+    )
+    stub(walletKitController) { mock in
+      mock.resolveOfferUrlDocTypes(offerUri: uri).thenReturn(offer)
+      mock.fetchIssuedDocuments(with: any()).thenReturn([Constants.createEuPidModel()])
+      mock.getIssuerRegistration(for: any()).thenReturn(nil)
+    }
+
+    let result = await interactor.processOfferRequest(with: uri)
+
+    if case .failure(let error) = result, case .transactionCodeFormat = error as? WalletCoreError {
+      XCTFail("A six-digit numeric code must be accepted")
+    }
+  }
+
+  func testProcessOfferRequest_WhenTxCodeHasAValidLength_ThenIsNotRefusedForTheCode() async {
+    let uri = "uri"
+    let offer = OfferedIssuanceModel(
+      issuerName: "issuerName",
+      issuerLogoUrl: "https://logo",
+      docModels: [],
+      txCodeSpec: TxCode(inputMode: .numeric, length: 4, description: "")
+    )
+    stub(walletKitController) { mock in
+      mock.resolveOfferUrlDocTypes(offerUri: uri).thenReturn(offer)
+      mock.fetchIssuedDocuments(with: any()).thenReturn([Constants.createEuPidModel()])
+      mock.getIssuerRegistration(for: any()).thenReturn(nil)
+    }
+
+    let result = await interactor.processOfferRequest(with: uri)
+
+    if case .failure(let error) = result, case .transactionCodeFormat = error as? WalletCoreError {
+      XCTFail("A four-digit numeric code must be accepted")
     }
   }
 
@@ -771,6 +1038,36 @@ final class TestDocumentOfferInteractor: EudiTest {
     }
   }
 
+  func testProcessOfferRequest_WhenIssuerRegistrationIsBlocked_ThenReturnRegistrationBlocked() async {
+    // Given: the offer resolves, but the issuer never established a registration — the case of an
+    // issuer that publishes no registration certificate at all.
+    let uri = "uri"
+    let offer = OfferedIssuanceModel(
+      issuerName: "issuerName",
+      issuerLogoUrl: "https://logo",
+      docModels: [],
+      txCodeSpec: nil
+    )
+    stub(walletKitController) { mock in
+      mock.resolveOfferUrlDocTypes(offerUri: uri).thenReturn(offer)
+      mock.fetchIssuedDocuments(with: any()).thenReturn([Constants.createEuPidModel()])
+      when(mock.getIssuerRegistration(for: any())).thenReturn(
+        .blocked(reason: .notRegisteredAsProvider)
+      )
+    }
+
+    // When
+    let result = await interactor.processOfferRequest(with: uri)
+
+    // Then: the flow stops before the offer screen is built, rather than issuing and undoing it.
+    switch result {
+    case .registrationBlocked(let reason):
+      XCTAssertEqual(reason, .notRegisteredAsProvider)
+    default:
+      XCTFail("Expected registrationBlocked, got \(result)")
+    }
+  }
+
   func testProcessOfferRequest_WhenResolveOfferUrlDocTypes_ThenReturnSuccess() async {
     // Given
     let expectedDocumentOfferUIModel = DocumentOfferUIModel(
@@ -816,12 +1113,79 @@ final class TestDocumentOfferInteractor: EudiTest {
     
     // Then
     switch result {
-    case .success(let doc):
+    case .success(let doc, _):
       XCTAssertEqual(doc.issuerName, expectedDocumentOfferUIModel.issuerName)
     default:
       XCTFail("Expected success, but got \(result)")
     }
   }
+
+  func testIssueDocuments_WhenOneOfTwoOfferedDocumentsIsIssued_ThenTheSuccessScreenNamesTheOther() async {
+    let document = Document(
+      id: "doc-id",
+      docType: "type",
+      docDataFormat: .sdjwt,
+      data: Data(),
+      docKeyInfo: nil,
+      createdAt: Date(),
+      metadata: nil,
+      displayName: "My Document",
+      status: .issued
+    )
+    stub(walletKitController) { mock in
+      when(mock.issueDocumentsByOfferUrl(offerUri: any(), docTypes: any(), txCodeValue: any()))
+        .thenReturn(IssuanceResult(documents: [document], issuerRegistration: nil))
+      when(mock.fetchDocuments(with: any())).thenReturn([Constants.createEuPidModel()])
+    }
+
+    let result = await interactor.issueDocuments(
+      with: "uri",
+      issuerName: "issuerName",
+      docOffers: [
+        offeredDocument(docType: "type", name: "My Document"),
+        offeredDocument(docType: "other", name: "Other Document")
+      ],
+      successNavigation: .push(.featureDashboardModule(.dashboard)),
+      txCodeValue: nil
+    )
+
+    guard
+      case .partialSuccess(let route) = result,
+      case .featureIssuanceModule(.issuanceSuccess(let config, _)) = route
+    else {
+      return XCTFail("Expected a partial success, got \(result)")
+    }
+    XCTAssertEqual((config as? DocumentSuccessUIConfig)?.notIssuedDocumentNames, ["Other Document"])
+  }
+
+  func testNotIssuedDocumentNames_WhenOneOfTwoOfferedDocumentsIsIssued_ThenNamesTheOther() {
+    let offered = [
+      offeredDocument(docType: "eu.europa.ec.eudi.pid.1", name: "PID"),
+      offeredDocument(docType: "org.iso.18013.5.1.mDL", name: "Driving Licence")
+    ]
+
+    let names = DocumentOfferInteractorImpl.notIssuedDocumentNames(
+      offered: offered,
+      issuedDocTypes: ["eu.europa.ec.eudi.pid.1"]
+    )
+
+    XCTAssertEqual(names, ["Driving Licence"])
+  }
+
+  func testNotIssuedDocumentNames_WhenTwoOfTheSameTypeAreOfferedAndOneIsIssued_ThenNamesOne() {
+    let offered = [
+      offeredDocument(docType: "eu.europa.ec.eudi.pid.1", name: "PID"),
+      offeredDocument(docType: "eu.europa.ec.eudi.pid.1", name: "PID (second)")
+    ]
+
+    let names = DocumentOfferInteractorImpl.notIssuedDocumentNames(
+      offered: offered,
+      issuedDocTypes: ["eu.europa.ec.eudi.pid.1"]
+    )
+
+    XCTAssertEqual(names, ["PID (second)"])
+  }
+
 }
 
 private extension TestDocumentOfferInteractor {
@@ -829,5 +1193,22 @@ private extension TestDocumentOfferInteractor {
     stub(configLogic) { mock in
       when(mock.forcePidActivation.get).thenReturn(true)
     }
+  }
+}
+
+private extension TestDocumentOfferInteractor {
+
+  func offeredDocument(docType: String, name: String) -> OfferedDocModel {
+    OfferedDocModel(
+      credentialConfigurationIdentifier: name,
+      docType: docType,
+      scope: nil,
+      identifier: nil,
+      displayName: name,
+      algValuesSupported: [],
+      claims: [],
+      credentialOptions: .init(credentialPolicy: .oneTimeUse, batchSize: 1),
+      keyOptions: nil
+    )
   }
 }

@@ -76,6 +76,17 @@ public extension DocumentOfferUIModel {
 }
 
 public extension DocumentOfferUIModel {
+
+  static func empty() -> DocumentOfferUIModel {
+    .init(
+      issuerName: LocalizableStringKey.unknownIssuer.toString,
+      issuerLogo: nil,
+      txCode: nil,
+      uiOffers: [],
+      docOffers: []
+    )
+  }
+
   static func mock() -> DocumentOfferUIModel {
     return .init(
       issuerName: LocalizableStringKey.unknownIssuer.toString,
@@ -124,10 +135,11 @@ public extension DocumentOfferUIModel {
 }
 
 extension OfferedIssuanceModel {
-  func transformToDocumentOfferUi() -> DocumentOfferUIModel {
+  /// - Parameter allowedLogoOrigins: Where the offer's issuer's logo may load from (`IssuerLogoOrigins.origins(ofOffer:)`).
+  func transformToDocumentOfferUi(allowedLogoOrigins: [String]) -> DocumentOfferUIModel {
     return self.docModels.transformToDocumentOfferUi(
       issuerName: self.issuerName,
-      issuerLogo: self.issuerLogoUrl,
+      issuerLogo: self.issuerLogoUrl.flatMap(URL.init(string:))?.allowedIssuerLogo(allowedOrigins: allowedLogoOrigins)?.absoluteString,
       codeRequired: self.isTxCodeRequired,
       codeLength: self.txCodeSpec?.length ?? 0
     )

@@ -31,7 +31,7 @@ let package = Package(
     ),
     .package(
       url: "https://github.com/rhummelmose/BluetoothKit.git",
-      branch: "master"
+      revision: "d6ab93cb3f98d9c4033bd37413d9fe90a4647cb4"
     ),
     .package(
       url: "https://github.com/Swinject/Swinject.git",
@@ -43,7 +43,11 @@ let package = Package(
     ),
     .package(
       url: "https://github.com/eu-digital-identity-wallet/eudi-lib-ios-rqes-ui.git",
-      exact: "0.4.3"
+      exact: "0.4.8"
+    ),
+    .package(
+      url: "https://github.com/eu-digital-identity-wallet/eudi-lib-ios-iso18013-data-model.git",
+      exact: "0.28.1"
     ),
     .package(name: "logic-test", path: "./logic-test")
   ],
@@ -67,6 +71,10 @@ let package = Package(
         .product(
           name: "EudiRQESUi",
           package: "eudi-lib-ios-rqes-ui"
+        ),
+        .product(
+          name: "MdocDataModel18013",
+          package: "eudi-lib-ios-iso18013-data-model"
         )
       ],
       path: "./Sources"
@@ -75,7 +83,11 @@ let package = Package(
       name: "logic-business-tests",
       dependencies: [
         "logic-business",
-        "logic-test"
+        "logic-test",
+        .product(
+          name: "MdocDataModel18013",
+          package: "eudi-lib-ios-iso18013-data-model"
+        )
       ],
       path: "./Tests"
     )

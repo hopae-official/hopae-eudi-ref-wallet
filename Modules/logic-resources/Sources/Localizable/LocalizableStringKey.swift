@@ -22,20 +22,81 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case search
   case genericErrorTitle
   case genericErrorDesc
+  case keyChainReadError
+  case keyChainWriteError
   case biometryOpenSettings
   case biometryConfirmRequest
+  case biometryUnlockReason
+  case biometryDeniedAccessError
+  case biometryNoFaceIdEnrolledError
+  case biometryNoFingerprintEnrolledError
+  case biometryNotRecognizedError
+  case biometryNotSupportedError
+  case biometryUnlockOffCaption
+  case biometryUnlockOnCaption
   case invalidQuickPin
+  case pinNotFoundError
   case tryAgain
   case shareButton
   case cancelButton
-  case requestDataCaption
   case requestDataInfoNotice
   case requestDataTitle([String])
   case requestCombinationTitle([String])
+  case requestRequestedDataTitle
+  case requestTransactionDataSectionTitle
+  case requestTransactionDataSignatureDetails
+  case requestTransactionDataNumbered([String])
+  case requestTransactionDataType
+  case requestTransactionDataTypeQes
+  case requestTransactionDataTypeQesRequest
+  case requestTransactionDataTrustFramework
+  case requestTransactionDataTrustFrameworkValue
+  case requestTransactionDataRequestedCredentials
+  case requestTransactionDataSigningCredentialId
+  case requestTransactionDataDocument
+  case requestTransactionDataHashRepresentation
+  case requestTransactionDataTypedHash([String])
+  case requestTransactionDataTypedHashAlgorithm([String])
+  case requestTransactionDataNumberOfSignatures
+  case requestTransactionDataDocumentNumbered([String])
+  case requestTransactionDataDocumentLocation
+  case requestTransactionDataOpenDocument
+  case requestTransactionDataExpectedChecksum
+  case requestTransactionDataChecksumAlgorithm
+  case requestTransactionDataSignatureType
+  case requestTransactionDataSignatureFormat
+  case requestTransactionDataConformanceLevel
+  case requestTransactionDataSignedAttributes
+  case requestTransactionDataOneTimePassword
+  case requestTransactionDataResponseUri
+  case requestTransactionDataLocation
+  case requestTransactionDataHashAlgorithms
+  case requestTransactionDataCircumstantialData
+  case requestTransactionDataSignedEnvelopeProperty
+  case requestTransactionDataReferenceUri
+  case requestTransactionDataSignatureAlgorithm
+  case requestTransactionDataSignatureAlgorithmParameters
+  case requestTransactionDataDocumentAccess
+  case requestTransactionDataDocumentAccessPublic
+  case requestTransactionDataDocumentAccessOtp
+  case requestTransactionDataDocumentAccessBasic
+  case requestTransactionDataDocumentAccessDigest
+  case requestTransactionDataDocumentAccessOauth
+  case requestTransactionDataDocumentContent
+  case requestTransactionDataDocumentContentInline
+  case requestTransactionDataDocumentType
+  case requestTransactionDataDocumentTypeOriginal
+  case requestTransactionDataDocumentTypeFormatted
+  case requestTransactionDataDocumentSize
+  case requestTransactionDataUnavailable
+  case requestTransactionDataSignatureQes
+  case requestTransactionDataSignatureQeseal
+  case requestTransactionDataSignatureAes
+  case requestTransactionDataSignatureAeseal
+  case requestTransactionDataSignatureAesqc
+  case requestTransactionDataSignatureAesealqc
   case documentAdded
-  case requestDataSheetCaption
   case okButton
-  case shareDataReview
   case success
   case successfullySharedFollowingInformation
   case incompleteRequestDataSelection
@@ -52,8 +113,6 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case addDocumentRequest
   case proximityConnectivityCaption
   case unavailableField
-  case requestDataVerifiedEntity
-  case requestDataVerifiedEntityMessage
   case changeQuickPinOption
   case quickPinSetTitle
   case quickPinEnterPin
@@ -190,6 +249,7 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case beyondThiryDays
   case beforeToday
   case issuanceRequest
+  case issuanceRequestTitle
   case myEuWallet
   case categoryGovernment
   case categoryHealth
@@ -201,6 +261,16 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case categoryTravel
   case changelog
   case sourceRepository
+  case resetWallet
+  case resetWalletConfirmTitle
+  case resetWalletConfirmMessage
+  case resetWalletConfirmButton
+  case resetWalletBiometryCaption
+  case resetWalletPinCaption
+  case resetWalletProgressTitle
+  case resetWalletProgressMessage
+  case screenCaptureCoverTitle
+  case screenCaptureCoverMessage
   case orderBy
   case filterByCategory
   case searchDocuments
@@ -217,6 +287,7 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case transactionInformation
   case transactionDetailsDataShare
   case transactionDetailsDataSigned
+  case transactionDetailsSigningRequest
   case transactionDetailsScreenCardDateLabel
   case transactionDetailsCompleted
   case or
@@ -231,13 +302,17 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case signing
   case issuance
   case deletion
-  case withoutRelyingName
   case errorFetchTransactionLog
   case incomplete
   case justNow
   case revoked
   case revokedModalTitle
   case revokedModalDescription
+  case suspended
+  case issuanceBlockedTitle
+  case issuanceBlockedMessage
+  case presentationBlockedTitle
+  case presentationBlockedMessage
   case transactionDetailsRequestDeletionMessage
   case transactionDetailsRequestDeletionButton
   case transactionDetailsReportTransactionMessage
@@ -274,15 +349,151 @@ public enum LocalizableStringKey: Equatable, Sendable {
   case documentDetailsExpiredOn([String])
   case documentDetailsIssuedOn([String])
   case documentDetailsRevokedDocument
+  case documentDetailsSuspendedDocument
   case documentDetailsIssuerCardIssuedMessageText
   case documentDetailsIssuerCardRevokedMessageText
+  case documentDetailsIssuerCardSuspendedMessageText
+  case documentDetailsIssuerCardStatusRefreshFailedText
+  case documentDetailsIssuerCardReIssuanceFailedText
+  case documentDetailsReIssueBlockedText
   case documentDetailsIssuerCardExpiredMessageText
   case documentDetailsIssuerCardIssuedActionButtonText
   case batchIssuanceCounter
+  case validateIssuerRegistration
+  case restartRequiredTitle
+  case restartRequiredMessage
   case documentProviderExtensionAcceptButton
   case documentProviderExtensionRejectButton
   case enterYourPin
   case homeScreenAuthenticateDescription
+  case relyingPartyId([String])
+  case privacyPolicy
+  case intendedUse
+  case understandRisksAgree
+  case relyingPartyNotVerifiedWarning
+  case requestUserImageNotice
+  case offerDocumentsToAppsTitle
+  case quickPinWeakError
+  case issuanceOfferIssuerNotConfiguredError
+  case issuanceSuccessNotIssuedWarning([String])
+  case transactionDetailsRegistrationNotVerifiedWarning
+  case requestTransactionDataChosenByRelyingPartyWarning
+  case requestTransactionDataNotShownError
+  case transactionDetailsRegistrationNotBoundWarning
+  case quickPinDeviceLockMissingWarning
+  case quickPinDeviceLockRequiredWarning
+  case documentOfferingDisabledMessage
+  case requestUserImageConfirmationTitle
+  case requestUserImageConfirmationMessage
+  case accessCertificateNotTrustedWarning
+  case relyingPartyOveraskedWarning
+  case notRegisteredData
+  case issuanceRegistrationBlockedTitle
+  case issuanceRegistrationBlockedMessage
+  case notCompleted
+  case reissuance
+  case filterByParty
+  case withoutPartyName
+  case transactionTypeDataDeletionRequest
+  case transactionTypeDpaReport
+  case transactionDetailsDeleteButton
+  case transactionDetailsDeleteTitle
+  case transactionDetailsDeleteMessage
+  case transactionDetailsDeleteError
+  case transactionDetailsDataRequested
+  case transactionDetailsIssuanceSection
+  case transactionDetailsCredentialsSection
+  case transactionDetailsTechnicalSection
+  case transactionDetailsDataDeletionSection
+  case transactionDetailsNoDataRequested
+  case transactionDetailsNoDataShared
+  case transactionDetailsNoClaims
+  case transactionDetailsNoInformation
+  case transactionDetailsUnknownClaim
+  case transactionDetailsIdentifierLabel
+  case transactionDetailsIdentifierSchemeLabel
+  case transactionDetailsContactLabel
+  case transactionDetailsPurposeLabel
+  case transactionDetailsRegistrarLabel
+  case transactionDetailsPrivacyPolicyLabel
+  case transactionDetailsIssuerTypeLabel
+  case transactionDetailsIssuedCountLabel
+  case transactionDetailsRequestedCountLabel
+  case transactionDetailsCredentialsIssuedSection
+  case transactionDetailsIssuedCount([String])
+  case transactionDetailsTriggerLabel
+  case transactionDetailsRequestedByYou
+  case transactionDetailsRenewedByWallet
+  case transactionDetailsCertificateLabel
+  case transactionDetailsFilenameLabel
+  case transactionDetailsFilesizeLabel
+  case transactionDetailsBytes([String])
+  case transactionDetailsDigestLabel
+  case transactionDetailsActionUnavailable
+  case transactionDetailsActionOpenFailed
+  case transactionDetailsActionError
+  case transactionDetailsDeletionEmailSubject([String])
+  case transactionDetailsDeletionEmailBody([String])
+  case transactionDetailsReportEmailSubject([String])
+  case transactionDetailsReportEmailBody([String])
+  case hideDetails
+  case transactionDetailsRelyingPartyLabel
+  case transactionDetailsIssuerLabel
+  case transactionDetailsSigningServiceLabel
+  case transactionDetailsAuthorityLabel
+  case transactionDetailsIntermediaryLabel
+  case transactionDetailsIntermediaryNameLabel
+  case transactionDetailsIntermediaryContactLabel
+  case transactionDetailsSigningIdentifierLabel
+  case transactionDetailsRequestDeletionSection
+  case transactionDetailsReportSection
+  case transactionDetailsPreviousDeletionRequests([String])
+  case transactionDetailsPreviousReports([String])
+  case transactionActionReportTitle
+  case transactionActionAuthorityLabel
+  case transactionActionReportMessageBold
+  case transactionActionReportMessage([String])
+  case transactionActionReportMessageNoAuthority
+  case transactionActionReportFollowUp([String])
+  case transactionActionReportFollowUpNoAuthority
+  case transactionActionCall
+  case transactionActionOpenEmail
+  case transactionActionVisitWebsite
+  case transactionHistoryDeletionTitle([String])
+  case transactionHistoryReportTitle([String])
+  case transactionHistoryDeletionDisclaimer
+  case transactionHistoryReportDisclaimer
+  case transactionHistoryDeletionMessage
+  case transactionHistoryReportMessage
+  case transactionHistoryChannelPhone
+  case transactionHistoryChannelEmail
+  case transactionHistoryChannelWebsite
+  case transactionHistoryChannelOther
+  case transactionActionDeletionScreenTitle
+  case transactionActionDeletionIntroWebsite([String])
+  case transactionActionDeletionIntroEmail([String])
+  case transactionActionDeletionIntroPhone([String])
+  case transactionActionDeletionNoticeBold
+  case transactionActionDeletionNoticeWebsite
+  case transactionActionDeletionNoticeEmail
+  case transactionActionDeletionNoticePhone
+  case transactionActionDeletionLegal([String])
+  case transactionActionContinueWebsite([String])
+  case transactionActionContinueEmail
+  case transactionActionContinuePhone([String])
+  case continueButton
+  case trustMarkAboutTitle
+  case trustMarkWelcomeTitle
+  case trustMarkWalletName
+  case trustMarkImageDescription
+  case trustMarkCertificationDescription([String])
+  case trustMarkCertifiedWalletsLink
+  case trustMarkCertificationInformationDescription([String])
+  case trustMarkCertificationInformationLink
+  case trustMarkLoading
+  case trustMarkLoadError
+  case trustMarkImageError
+  case trustMarkBrowserError
 }
 
 public extension LocalizableStringKey {

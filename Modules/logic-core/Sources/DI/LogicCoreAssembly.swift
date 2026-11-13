@@ -27,7 +27,8 @@ public final class LogicCoreAssembly: Assembly {
       WalletKitConfigImpl(
         configLogic: r.force(ConfigLogic.self),
         transactionLogger: r.force(TransactionLogger.self),
-        walletKitAttestationProvider: r.force(WalletKitAttestationProvider.self)
+        walletKitAttestationProvider: r.force(WalletKitAttestationProvider.self),
+        prefsController: r.force(PrefsController.self)
       )
     }
     .inObjectScope(ObjectScope.container)
@@ -51,11 +52,22 @@ public final class LogicCoreAssembly: Assembly {
         transactionLogStorageController: r.force((any TransactionLogStorageController).self),
         revokedDocumentStorageController: r.force((any RevokedDocumentStorageController).self),
         failedReIssuedDocStorageController: r.force((any FailedReIssuedDocStorageController).self),
+        statusRefreshFailureStorageController: r.force((any StatusRefreshFailureStorageController).self),
+        storageEraseController: r.force(StorageEraseController.self),
         networkSessionProvider: r.force((any NetworkSessionProvider).self),
-        documentRegistrationManager: r.force((any DocumentRegistrationManager).self)
+        documentRegistrationManager: r.force((any DocumentRegistrationManager).self),
+        prefsController: r.force(PrefsController.self),
+        registrationCheckProvider: r.force(RegistrationCheckProvider.self)
       )
     }
     .inObjectScope(ObjectScope.container)
+
+    container.register(WalletKitTrustMarkController.self) { r in
+      WalletKitTrustMarkControllerImpl(
+        walletKitController: r.force(WalletKitController.self)
+      )
+    }
+    .inObjectScope(ObjectScope.transient)
 
     container.register(WalletProviderAttestationConfig.self) { r in
       WalletProviderAttestationConfigImpl(
@@ -64,9 +76,15 @@ public final class LogicCoreAssembly: Assembly {
     }
     .inObjectScope(ObjectScope.container)
 
+    container.register(RegistrationCheckProvider.self) { _ in
+      RegistrationCheckProviderImpl()
+    }
+    .inObjectScope(ObjectScope.container)
+
     container.register(TransactionLogger.self) { r in
       WalletKitTransactionLogControllerImpl(
-        transactionLogStorageController: r.force((any TransactionLogStorageController).self)
+        transactionLogStorageController: r.force((any TransactionLogStorageController).self),
+        registrationCheckProvider: r.force(RegistrationCheckProvider.self)
       )
     }
     .inObjectScope(ObjectScope.graph)
@@ -77,15 +95,31 @@ public final class LogicCoreAssembly: Assembly {
         walletKitController: r.force(WalletKitController.self)
       )
     }
-    .inObjectScope(ObjectScope.graph)
+    .inObjectScope(ObjectScope.container)
 
     container.register(ReIssuanceWorkManager.self) { r in
       ReIssuanceWorkManagerImpl(
         configLogic: r.force(WalletKitConfig.self),
-        walletKitController: r.force(WalletKitController.self)
+        walletKitController: r.force(WalletKitController.self),
+        revocationWorkManager: r.force(RevocationWorkManager.self)
       )
     }
-    .inObjectScope(ObjectScope.graph)
+    .inObjectScope(ObjectScope.container)
+
+    container.register(WalletResetStatusProvider.self) { _ in
+      WalletResetStatusProviderImpl()
+    }
+    .inObjectScope(ObjectScope.container)
+
+    container.register(WalletWorkScheduler.self) { r in
+      WalletWorkSchedulerImpl(
+        revocationWorkManager: r.force(RevocationWorkManager.self),
+        reIssuanceWorkManager: r.force(ReIssuanceWorkManager.self),
+        stopTimeout: r.force(WalletKitConfig.self).workerStopTimeoutSeconds,
+        resetStatusProvider: r.force(WalletResetStatusProvider.self)
+      )
+    }
+    .inObjectScope(ObjectScope.container)
 
     container.register(WalletKitAttestationProvider.self) { r in
       WalletKitAttestationProviderImpl(

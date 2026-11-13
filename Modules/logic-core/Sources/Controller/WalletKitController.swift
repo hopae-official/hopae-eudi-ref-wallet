@@ -17,6 +17,9 @@ import logic_business
 import SwiftUI
 import logic_storage
 import logic_api
+import enum OpenID4VCI.CredentialOfferRequest
+import struct OpenID4VCI.CredentialOfferRequestObject
+import struct OpenID4VCI.Fetcher
 
 private enum KeyIdentifier: String, KeyChainWrapper {
   public var value: String {
@@ -33,23 +36,35 @@ public protocol WalletKitController: Sendable {
   func startSameDevicePresentation(deepLink: URLComponents) async -> RemoteSessionCoordinator
   func startCrossDevicePresentation(urlString: String) async -> RemoteSessionCoordinator
   func stopPresentation() async
+  /// Clears `coordinator` as the active remote session if it still is; a session that started after it stays. The
+  /// caller stops the coordinator itself.
+  func stopRemotePresentation(_ coordinator: RemoteSessionCoordinator) async
+  /// Stops the Bluetooth session of `coordinator` only while it is the active one, so a presentation that ends
+  /// never stops one that started after it.
+  func stopProximityPresentation(_ coordinator: ProximitySessionCoordinator) async
 
   func fetchAllDocuments() async -> [any DocClaimsDecodable]
   func fetchDeferredDocuments() async -> [WalletStorage.Document]
   func fetchIssuedDocuments() async -> [any DocClaimsDecodable]
   func fetchIssuedDocuments(with types: [DocumentTypeIdentifier]) async -> [any DocClaimsDecodable]
-  func fetchIssuedDocuments(excluded: [DocumentTypeIdentifier]) async -> [any DocClaimsDecodable]
   func fetchMainPidDocument() async -> (any DocClaimsDecodable)?
   func fetchDocument(with id: String) async -> (any DocClaimsDecodable)?
   func fetchDocuments(with ids: [String]) async -> [any DocClaimsDecodable]
-  func clearAllDocuments() async
+  func clearAllDocuments() async throws
   func deleteDocument(with id: String, status: DocumentStatus) async throws
+  /// Loads the documents into WalletKit. It leaves the Digital Credential API registrations to the caller's
+  /// `reconcileRegistrations()`, so that a slow registration store does not hold up the documents.
   func loadDocuments() async throws
+  /// Whether the wallet holds any document, read from the Keychain without loading one: the query asks
+  /// for no attributes and no data. A read error throws `KeyChainError.readFailed`.
+  func hasStoredDocuments() async throws -> Bool
   func issueDocuments(
     issuerId: String,
     identifiers: [String],
     docTypeIdentifier: DocumentTypeIdentifier
-  ) async throws -> [WalletStorage.Document]
+  ) async throws -> IssuanceResult
+  /// Throws `WalletCoreError.documentBlocked` for a document the issuer has revoked or suspended, checked just
+  /// before the issuer is asked, so a background re-issuance that chose the document earlier refuses it too.
   func reIssueDocument(
     identifier: String,
     isBackgroundOperation: Bool
@@ -61,7 +76,7 @@ public protocol WalletKitController: Sendable {
     offerUri: String,
     docTypes: [OfferedDocModel],
     txCodeValue: String?
-  ) async throws -> [WalletStorage.Document]
+  ) async throws -> IssuanceResult
   func parseDocClaim(
     docId: String,
     groupId: String,
@@ -73,28 +88,78 @@ public protocol WalletKitController: Sendable {
   func resumePendingIssuance(pendingDoc: WalletStorage.Document, webUrl: URL?) async throws -> WalletStorage.Document
   func storeDynamicIssuancePendingUrl(with url: URL) async
   func getDynamicIssuancePendingData() async -> DynamicIssuancePendingData?
-  func getScopedDocuments() async throws -> [ScopedDocument]
+  func getScopedDocuments() async -> ScopedDocumentsResult
   func getDocumentCategories() async -> DocumentCategories
 
   func isDocumentBookmarked(with id: String) async -> Bool
   func storeBookmarkedDocument(with id: String) async throws
   func removeBookmarkedDocument(with id: String) async throws
 
-  func fetchTransactionLog(with id: String) async throws -> TransactionLogItem
-  func fetchTransactionLogs() async throws -> [TransactionLogItem]
+  func fetchTransactionLog(with id: String) async throws -> TransactionLogDomain
+  func fetchTransactionLogs() async throws -> [TransactionLogDomain]
+  /// Deletes the wallet's own records for the factory reset: the transaction history first, then the bookmarks,
+  /// the revocation records, the re-issuance failures and the status refresh failures; then erases the store, so
+  /// no deleted row stays readable on disk.
+  func deleteAllRecords() async throws
+  /// Changes whenever the transaction history is written or deleted, so a reader can tell whether it changed.
+  func fetchTransactionLogRevision() async -> String
+  func deleteTransactionLog(with id: String) async throws
+  func fetchPresentationActions(parentPresentationId: String) async throws -> [TransactionLogDomain]
+  func recordDataDeletionRequest(for presentation: TransactionLogDomain.Presentation, contactUrl: URL) async throws
+  func recordDpaReport(for presentation: TransactionLogDomain.Presentation, contactUrl: URL) async throws
 
-  func isDocumentRevoked(with id: String) async -> Bool
-  func fetchRevokedDocuments() async throws -> [String]
-  func storeRevokedDocuments(with ids: [String]) async throws
+  /// The revocation record of every document that has one. A record without a status, or with one this
+  /// build does not know, counts as unrecognised. An empty store gives an empty result; a failed read throws.
+  func fetchRevokedDocumentStatuses() async throws -> [String: DocumentRevocationStatus]
+  /// Stores or replaces the revocation record of each document, and takes the documents out of the Digital
+  /// Credential API registrations.
+  func storeRevokedDocuments(with statuses: [String: DocumentRevocationStatus]) async throws
+  /// Removes a document's revocation record, and offers it through the Digital Credential API again.
   func removeRevokedDocument(with id: String) async throws
+  /// The revocation record of one document, or `nil` if it has none.
+  func getDocumentRevocationStatus(with id: String) async -> DocumentRevocationStatus?
 
-  func getDocumentStatus(for statusIdentifier: StatusIdentifier) async throws -> CredentialStatus
+  /// The documents whose status could not be refreshed at the last revocation check. An empty store
+  /// gives an empty set; a failed read throws.
+  func fetchStatusRefreshFailures() async throws -> Set<String>
+  /// Records that the status of each document could not be refreshed.
+  func storeStatusRefreshFailures(ids: [String]) async throws
+  /// Removes the refresh-failure record of each document, after a check has read its status again.
+  func removeStatusRefreshFailures(ids: [String]) async throws
+  /// Whether the last revocation check could not refresh the document's status.
+  func hasStatusRefreshFailure(with id: String) async -> Bool
+
+  func getDocumentStatus(for statusList: MdocDataModel18013.StatusList) async throws -> CredentialStatus
   func isDocumentLowOnCredentials(document: (any DocClaimsDecodable)?) async -> Bool
 
   func storeFailedReIssuedDocuments(ids: [String]) async throws
   func removeAllFailedReIssuedDocuments() async throws
+  /// Whether the last background re-issuance could not renew the document.
+  func hasReIssuanceFailure(with id: String) async -> Bool
 
   func refreshUsageCounters() async throws
+  func getIssuerRegistration(for offer: OfferedIssuanceModel) async -> IssuerRegistration?
+  /// Registers the documents for the Digital Credential API, or withdraws every registration while the user has
+  /// turned the offering off (`Prefs.Key.offerDocumentsToApps`).
+  func reconcileRegistrations() async
+  /// Where each issuer's logo may load from: its own origin and its `VciConfig.logoOrigins`.
+  func issuerLogoOrigins() async -> IssuerLogoOrigins
+  /// The issuer's registration for the issuer-list flow and re-issuance, resolved before the issuer is contacted. A
+  /// lookup that fails refuses for a trust failure and throws any other error, so a failure never reads as "no
+  /// registration"; with the check off nothing is looked up.
+  func getIssuerRegistration(issuerId: String, configIds: [String]) async throws -> IssuerRegistration?
+
+  func getVerifierRegistration(
+    policy: WrpRegistrationPolicy?,
+    trustViolations: [String],
+    overaskedClaims: [logic_core.OveraskedClaim],
+    verifierName: String?,
+    verifierIsTrusted: Bool,
+    isNotBoundToRequester: Bool,
+    transactionIdentifier: String
+  ) async -> RelyingPartyRegistration
+
+  func getVerifierRegistrationForFailedRequest() async -> RelyingPartyRegistration?
 }
 
 final actor WalletKitControllerImpl: WalletKitController {
@@ -109,7 +174,23 @@ final actor WalletKitControllerImpl: WalletKitController {
   private let transactionLogStorageController: any TransactionLogStorageController
   private let revokedDocumentStorageController: any RevokedDocumentStorageController
   private let failedReIssuedDocStorageController: any FailedReIssuedDocStorageController
+  private let statusRefreshFailureStorageController: any StatusRefreshFailureStorageController
+  private let storageEraseController: StorageEraseController
   private let documentRegistrationManager: DocumentRegistrationManager
+  private let prefsController: PrefsController
+  private let registrationCheckProvider: RegistrationCheckProvider
+  private let registrationRunner = SerialCheckRunner()
+  /// "Check Registration Certificates" as WalletKit was configured with it at launch; the setting applies after a
+  /// restart, so the app's own decisions follow the same value.
+  private let isRegistrationChecked: Bool
+  /// The OpenID4VP configuration built at launch, so every remote presentation applies the registration-check setting
+  /// read then, as the app's own decisions do (`isRegistrationChecked`), until the app restarts.
+  private let openID4VpConfig: OpenId4VpConfiguration
+  /// The app's HTTP session, the one WalletKit also uses, through which the app fetches an offer passed by reference.
+  private let urlSession: URLSession
+  /// The link WalletKit got for each offer resolved, by the link the wallet received, so the issuance that follows
+  /// uses the offer that was checked, also when another offer was opened in between.
+  private var resolvedOfferLinks: [String: String] = [:]
 
   init(
     walletKitConfig: WalletKitConfig,
@@ -120,8 +201,12 @@ final actor WalletKitControllerImpl: WalletKitController {
     transactionLogStorageController: any TransactionLogStorageController,
     revokedDocumentStorageController: any RevokedDocumentStorageController,
     failedReIssuedDocStorageController: any FailedReIssuedDocStorageController,
+    statusRefreshFailureStorageController: any StatusRefreshFailureStorageController,
+    storageEraseController: StorageEraseController,
     networkSessionProvider: NetworkSessionProvider,
-    documentRegistrationManager: DocumentRegistrationManager
+    documentRegistrationManager: DocumentRegistrationManager,
+    prefsController: PrefsController,
+    registrationCheckProvider: RegistrationCheckProvider
   ) {
     self.walletKitConfig = walletKitConfig
     self.configLogic = configLogic
@@ -131,22 +216,34 @@ final actor WalletKitControllerImpl: WalletKitController {
     self.transactionLogStorageController = transactionLogStorageController
     self.revokedDocumentStorageController = revokedDocumentStorageController
     self.failedReIssuedDocStorageController = failedReIssuedDocStorageController
+    self.statusRefreshFailureStorageController = statusRefreshFailureStorageController
+    self.storageEraseController = storageEraseController
     self.documentRegistrationManager = documentRegistrationManager
+    self.prefsController = prefsController
+    self.registrationCheckProvider = registrationCheckProvider
+    if walletKitConfig.logFileName == nil {
+      Self.removeLogFileOfAnEarlierBuild()
+    }
+    self.isRegistrationChecked = walletKitConfig.validateIssuerRegistrationCertificate
+    let openID4VpConfig = walletKitConfig.vpConfig
+    self.openID4VpConfig = openID4VpConfig
+    self.urlSession = networkSessionProvider.urlSession
 
     guard let walletKit = try? EudiWallet(
       eudiWalletConfig: EudiWalletConfiguration(
         serviceName: configLogic.keyChainConfig.documentStorageServiceName,
         accessGroup: configLogic.keyChainConfig.keychainAccessGroup,
         userAuthenticationRequired: walletKitConfig.userAuthenticationRequired,
-        trustedReaderRootCertificates: walletKitConfig.trustedReaderRootCertificates,
         deviceAuthMethod: .deviceSignature,
         uiCulture: Locale.current.systemLanguageCode,
         logFileName: walletKitConfig.logFileName
       ),
-      openID4VpConfig: walletKitConfig.vpConfig,
+      trustConfig: walletKitConfig.trustConfiguration,
+      openID4VpConfig: openID4VpConfig,
       openID4VciConfigurations: walletKitConfig.issuersConfig.mapValues { $0.config },
       networking: networkSessionProvider.urlSession,
-      transactionLogger: walletKitConfig.transactionLogger
+      transactionLogger: walletKitConfig.transactionLogger,
+      trustMarkSource: walletKitConfig.trustMarkSource
     ) else {
       fatalError("Unable to Initialize WalletKit")
     }
@@ -154,11 +251,70 @@ final actor WalletKitControllerImpl: WalletKitController {
     wallet = walletKit
   }
 
+  /// Resolves the offer behind `offerUri` only if the offer itself names a configured issuer as its
+  /// `credential_issuer` (`checkedOfferLink(for:)`), and keeps the link WalletKit got for the issuance that follows.
   func resolveOfferUrlDocTypes(offerUri: String) async throws -> OfferedIssuanceModel {
+    let offerLink = try await checkedOfferLink(for: offerUri)
+    resolvedOfferLinks[offerUri] = offerLink
     return try await wallet.resolveOfferUrlDocTypes(
-      offerUri: offerUri,
+      offerUri: offerLink,
       authFlowRedirectionURI: nil
     )
+  }
+
+  /// The link WalletKit gets for the offer behind `offerUri`, refused (`WalletCoreError.issuerNotConfigured`) unless
+  /// the offer names one of the configured issuers as its own `credential_issuer`, compared exactly, which is the
+  /// issuer WalletKit then contacts. An offer passed by value is checked as it is. One passed by reference is fetched
+  /// here, through the app's session, from an address on a configured issuer's origin (`OfferIssuer`; redirects are
+  /// followed), and checked before WalletKit sees it; WalletKit then gets it by value, so it does not fetch the offer
+  /// again. An offer that cannot be fetched or read fails as WalletKit fails it (`offerFetchError(for:)`).
+  private func checkedOfferLink(for offerUri: String) async throws -> String {
+    try requireConfiguredIssuer(of: offerUri)
+    guard case .fetchByReference(let reference) = try CredentialOfferRequest(urlString: offerUri) else {
+      return offerUri
+    }
+    let offer: String
+    do {
+      offer = try await Fetcher<CredentialOfferRequestObject>(session: urlSession).fetchString(url: reference).get()
+    } catch {
+      throw Self.offerFetchError(for: error)
+    }
+    guard let offerLink = OfferIssuer.byValueLink(offerUri: offerUri, offer: offer) else {
+      throw Self.offerFetchError()
+    }
+    switch OfferIssuer.of(offerUri: offerLink, configuredIssuers: configuredIssuers) {
+    case .configured:
+      return offerLink
+    case .notConfigured:
+      throw WalletCoreError.issuerNotConfigured
+    case .unreadable:
+      throw Self.offerFetchError()
+    }
+  }
+
+  /// The error WalletKit gives when it cannot fetch or read an offer passed by reference
+  /// (`EudiWallet.resolveCredentialOffer`, which names the issuer "server" for such a link), so the offer screen shows
+  /// the same message now that the app fetches the offer itself.
+  private static func offerFetchError(for error: Error? = nil) -> WalletError {
+    WalletError(
+      description: "Credential offer from server cannot be trusted.",
+      code: .offerResolutionFailed,
+      innerError: error
+    )
+  }
+
+  /// Refuses an offer link that does not come from a configured issuer (`OfferIssuer`), before anything is fetched:
+  /// wallet-kit would otherwise give an unknown issuer the first configured issuer's client settings.
+  private func requireConfiguredIssuer(of offerUri: String) throws {
+    try OfferIssuer.requireConfigured(
+      offerUri: offerUri,
+      configuredIssuers: configuredIssuers
+    )
+  }
+
+  /// The `credential_issuer` of every configured issuer.
+  private var configuredIssuers: [String] {
+    walletKitConfig.issuersConfig.values.compactMap(\.config.credentialIssuerURL)
   }
 
   private func resolveCredentialOptions(
@@ -175,11 +331,19 @@ final actor WalletKitControllerImpl: WalletKitController {
     return try? await wallet.getDocumentCredentialOptions(documentId: id)
   }
 
+  /// Issues from the offer resolved for the same link with the link WalletKit got then, so an issuer cannot change an
+  /// offer passed by reference between the check and the issuance; any other link is checked first.
   func issueDocumentsByOfferUrl(
     offerUri: String,
     docTypes: [OfferedDocModel],
     txCodeValue: String?
-  ) async throws -> [WalletStorage.Document] {
+  ) async throws -> IssuanceResult {
+    let offerLink: String
+    if let resolvedOfferLink = resolvedOfferLinks[offerUri] {
+      offerLink = resolvedOfferLink
+    } else {
+      offerLink = try await checkedOfferLink(for: offerUri)
+    }
     let docTypes = docTypes.map { docType in
       let credentialOptions = walletKitConfig.documentIssuanceConfig.credentialOptions(for: docType.documentTypeIdentifier)
       return docType.copy(
@@ -188,31 +352,66 @@ final actor WalletKitControllerImpl: WalletKitController {
       )
     }
 
-    return try await wallet.issueDocumentsByOfferUrl(
-      offerUri: offerUri,
+    let response = try await wallet.issueDocumentsByOfferUrl(
+      offerUri: offerLink,
       docTypes: docTypes,
       txCodeValue: txCodeValue
     )
+    await reconcileRegistrations()
+    return IssuanceResult(
+      documents: response.documents,
+      issuerRegistration: makeIssuerRegistration(
+        policy: response.wrpIssuerPolicy,
+        warnings: response.wrpIssuerWarnings
+      )
+    )
   }
 
-  func clearAllDocuments() async {
-    try? await wallet.deleteAllDocuments()
-    try? await removeAllRegistration(
-      with: wallet.loadAllDocuments()?.compactMap { return $0.id }
-    )
+  /// Deletes every document and updates the Digital Credential API registrations, also when the deletion fails
+  /// part way, so a document that is gone is no longer offered.
+  /// With the documents go every document's records (`deleteRecords(of:)`); the history stays.
+  func clearAllDocuments() async throws {
+    do {
+      try await wallet.deleteAllDocuments()
+    } catch {
+      await reconcileRegistrations()
+      throw error
+    }
+    try? await revokedDocumentStorageController.deleteAll()
+    try? await statusRefreshFailureStorageController.deleteAll()
+    try? await bookmarkStorageController.deleteAll()
+    try? await failedReIssuedDocStorageController.deleteAll()
+    await reconcileRegistrations()
   }
 
   func deleteDocument(with id: String, status: DocumentStatus) async throws {
     try await wallet.deleteDocument(id: id, status: status)
-    try await revokedDocumentStorageController.delete(id)
+    do {
+      try await deleteRecords(of: id)
+    } catch {
+      await reconcileRegistrations()
+      throw error
+    }
+    await reconcileRegistrations()
   }
 
   func loadDocuments() async throws {
     _ = try await wallet.loadAllDocuments()
   }
 
+  func hasStoredDocuments() throws -> Bool {
+    try StoredDocumentPresence(
+      serviceName: configLogic.keyChainConfig.documentStorageServiceName,
+      accessGroup: configLogic.keyChainConfig.keychainAccessGroup
+    ).hasDocuments()
+  }
+
+  /// The registration validator is shared with remote presentations, and wallet-kit clears it for a Bluetooth request
+  /// only once a registration certificate is validated, so it is cleared here first: a request that fails before
+  /// that does not show the previous party's registration.
   func startProximityPresentation() async -> ProximitySessionCoordinator {
     await self.stopPresentation()
+    await wallet.wrpRegistrationValidator.resetValidations()
     let session = await wallet.beginPresentation(flow: .ble)
     let proximitySessionCoordinator = DIGraph.shared.resolver.force(
       ProximitySessionCoordinator.self,
@@ -238,6 +437,14 @@ final actor WalletKitControllerImpl: WalletKitController {
     await self.sessionCoordinatorHolder.clear()
   }
 
+  func stopRemotePresentation(_ coordinator: RemoteSessionCoordinator) async {
+    await self.sessionCoordinatorHolder.clearRemoteCoordinator(coordinator)
+  }
+
+  func stopProximityPresentation(_ coordinator: ProximitySessionCoordinator) async {
+    await self.sessionCoordinatorHolder.clearProximityCoordinator(coordinator)
+  }
+
   func fetchAllDocuments() async -> [any DocClaimsDecodable] {
     return fetchIssuedDocuments() + fetchDeferredDocuments().transformToDeferredDecodables()
   }
@@ -260,18 +467,13 @@ final actor WalletKitControllerImpl: WalletKitController {
       .sorted { $0.createdAt > $1.createdAt }.last
   }
 
-  func fetchIssuedDocuments(excluded: [DocumentTypeIdentifier]) -> [any DocClaimsDecodable] {
-    let excludedRawValues = excluded.map { $0.rawValue }
-    return fetchIssuedDocuments().filter { !excludedRawValues.contains($0.docType) }
-  }
-
   func fetchDocument(with id: String) -> (any DocClaimsDecodable)? {
     wallet.storage.getDocumentModel(id: id)
   }
 
-  func fetchDocuments(with ids: [String]) -> [any DocClaimsDecodable] {
+  func fetchDocuments(with ids: [String]) async -> [any DocClaimsDecodable] {
     let documents = fetchIssuedDocuments().filter { ids.contains($0.id) }
-    registerForDocumentIdentityExtension(documents: documents)
+    await reconcileRegistrations()
     return documents
   }
 
@@ -279,29 +481,108 @@ final actor WalletKitControllerImpl: WalletKitController {
     issuerId: String,
     identifiers: [String],
     docTypeIdentifier: DocumentTypeIdentifier
-  ) async throws -> [WalletStorage.Document] {
+  ) async throws -> IssuanceResult {
     let credentialOptions = walletKitConfig.documentIssuanceConfig.credentialOptions(for: docTypeIdentifier)
 
-    let documents = try await wallet.issueDocuments(
+    let response = try await wallet.issueDocuments(
       issuerName: issuerId,
-      docTypeIdentifiers: identifiers.map { .identifier($0) },
-      credentialOptions: credentialOptions,
-      keyOptions: walletKitConfig.keyOptions
+      configuration: identifiers.map {
+        DocumentIssuanceConfiguration(
+          docTypeIdentifier: .identifier($0),
+          credentialOptions: credentialOptions,
+          keyOptions: walletKitConfig.keyOptions
+        )
+      }
     )
-    return documents
+    await reconcileRegistrations()
+    return IssuanceResult(
+      documents: response.documents,
+      issuerRegistration: makeIssuerRegistration(
+        policy: response.wrpIssuerPolicy,
+        warnings: response.wrpIssuerWarnings
+      )
+    )
   }
 
+  private func makeIssuerRegistration(
+    policy: WrpRegistrationPolicy?,
+    warnings: [String: [RegistrationPolicyViolation]]?
+  ) -> IssuerRegistration? {
+    Self.makeIssuerRegistration(policy: policy, warnings: warnings, isRegistrationChecked: isRegistrationChecked)
+  }
+
+  /// The one rule deciding whether an issuer's registration lets an issuance through, as the Android wallet's
+  /// `isBlockedForIssuance`: with the registration check on, anything short of a verified registration refuses,
+  /// whatever `wrprcVciTrustPolicy` says, a registration that was never established included (a certificate that
+  /// cannot be decoded under `.warning`). With the check off nothing is evaluated and nothing refuses.
+  static func makeIssuerRegistration(
+    policy: WrpRegistrationPolicy?,
+    warnings: [String: [RegistrationPolicyViolation]]?,
+    isRegistrationChecked: Bool
+  ) -> IssuerRegistration? {
+
+    guard isRegistrationChecked else { return nil }
+
+    guard let policy else { return .blocked(reason: .notRegisteredAsProvider) }
+
+    let raised = (warnings ?? [:]).values.flatMap { $0 }
+
+    if raised.contains(where: { if case .credentialNotCovered = $0.reason { true } else { false } }) {
+      return .blocked(reason: .attestationNotRegistered)
+    }
+
+    guard raised.isEmpty else { return .blocked(reason: .notRegisteredAsProvider) }
+
+    return .verified(
+      details: RegistrationDetails(
+        tradeName: policy.name ?? policy.sub,
+        uniqueId: policy.sub,
+        logoUrl: nil,
+        intendedUse: policy.purpose?.localizedValue,
+        privacyPolicyUrl: policy.privacyPolicy.flatMap { URL(string: $0) },
+        serviceDescription: policy.srvDescription?.localizedValue
+      )
+    )
+  }
+
+  /// A renewed document keeps the original's bookmark, as on Android. A bookmark that cannot be copied
+  /// does not fail the renewal.
   func reIssueDocument(identifier: String, isBackgroundOperation: Bool) async throws -> WalletStorage.Document {
+    try await refuseReIssueIfBlocked(identifier)
+    let document = fetchDocument(with: identifier)
+    let isBookmarked = await isDocumentBookmarked(with: identifier)
+
+    if isRegistrationChecked {
+      guard
+        let issuerId = document?.credentialIssuerIdentifier,
+        let configId = document?.configurationIdentifier
+      else {
+        throw RegistrationRefusedError()
+      }
+      if case .blocked = try await getIssuerRegistration(issuerId: issuerId, configIds: [configId]) {
+        throw RegistrationRefusedError()
+      }
+    }
+
     let credentialOptions = await resolveCredentialOptions(
       documentId: identifier,
-      documentTypeIdentifier: fetchDocument(with: identifier)?.documentTypeIdentifier
+      documentTypeIdentifier: document?.documentTypeIdentifier
     )
-    return try await wallet.reissueDocument(
+    let response = try await wallet.reissueDocument(
       documentId: identifier,
       credentialOptions: credentialOptions,
       keyOptions: walletKitConfig.keyOptions,
       backgroundOnly: isBackgroundOperation
     )
+    guard let document = response.documents.first else {
+      throw WalletCoreError.unableToIssueAndStore
+    }
+    await bookmarkStorageController.carryBookmark(wasBookmarked: isBookmarked, to: response.documents.map(\.id))
+    if !response.documents.contains(where: { $0.id == identifier }) {
+      try? await deleteRecords(of: identifier, keepingRevocationRecord: true)
+    }
+    await reconcileRegistrations()
+    return document
   }
 
   func requestDeferredIssuance(with doc: WalletStorage.Document) async throws -> any DocClaimsDecodable {
@@ -322,16 +603,34 @@ final actor WalletKitControllerImpl: WalletKitController {
     )
     if result.isDeferred {
       return result.transformToDeferredDecodable()
-    } else if let doc = fetchDocument(with: result.id) {
-      return doc
+    } else if let issued = fetchDocument(with: result.id) {
+      if result.id != doc.id {
+        try? await deleteRecords(of: doc.id)
+      }
+      await reconcileRegistrations()
+      return issued
     } else {
       throw WalletCoreError.unableFetchDocument
     }
   }
 
+  /// Deletes the records the wallet keeps for a document: its revocation record, refresh failure, bookmark and failed
+  /// re-issue, as Android's `deleteDocumentRecords`; its history stays, a legal record. After a re-issue the
+  /// original's revocation record stays until the check after the re-issue has read it.
+  private func deleteRecords(of id: String, keepingRevocationRecord: Bool = false) async throws {
+    if !keepingRevocationRecord {
+      try await revokedDocumentStorageController.delete(id)
+    }
+    try await statusRefreshFailureStorageController.delete(id)
+    try await bookmarkStorageController.delete(id)
+    try await failedReIssuedDocStorageController.delete(id)
+  }
+
+  /// Nil in builds that write no log file, so Settings offers no "Retrieve logs".
   func retrieveLogFileUrl() -> URL? {
     guard
-      let url = try? EudiWallet.getLogFileURL(walletKitConfig.logFileName)
+      let logFileName = walletKitConfig.logFileName,
+      let url = try? EudiWallet.getLogFileURL(logFileName)
     else {
       return nil
     }
@@ -360,13 +659,15 @@ final actor WalletKitControllerImpl: WalletKitController {
       documentId: pendingDoc.id,
       documentTypeIdentifier: pendingDoc.documentTypeIdentifier
     )
-    return try await wallet.resumePendingIssuance(
+    let document = try await wallet.resumePendingIssuance(
       issuerName: metadata.credentialIssuerIdentifier,
       pendingDoc: pendingDoc,
       webUrl: webUrl,
       credentialOptions: credentialOptions,
       keyOptions: walletKitConfig.keyOptions
     )
+    await reconcileRegistrations()
+    return document
   }
 
   func storeDynamicIssuancePendingUrl(with url: URL) {
@@ -396,49 +697,65 @@ final actor WalletKitControllerImpl: WalletKitController {
     return .init(pendingDoc: pendingDoc, url: url)
   }
 
-  func getScopedDocuments() async throws -> [ScopedDocument] {
+  func getScopedDocuments() async -> ScopedDocumentsResult {
 
-    try await withThrowingTaskGroup(of: [ScopedDocument].self) { group in
-      for (issuerName, orderedVciConfig) in walletKitConfig.issuersConfig {
+    let issuersConfig = walletKitConfig.issuersConfig
+
+    return await withTaskGroup(of: Result<[ScopedDocument], Error>.self) { group in
+      for (issuerName, orderedVciConfig) in issuersConfig {
         group.addTask {
-          let metadata = try await self.wallet.getIssuerMetadata(issuerName: issuerName)
-          return metadata.credentialsSupported.compactMap { credential in
-            switch credential.value {
-            case .msoMdoc(let config):
-              let id = DocumentTypeIdentifier(rawValue: config.docType)
-              return ScopedDocument(
-                name: config.credentialMetadata?.display.getName(fallback: credential.key.value) ?? credential.key.value,
-                issuer: metadata.credentialIssuerIdentifier.url.host.ifNilOrEmpty { issuerName },
-                order: orderedVciConfig.order,
-                configId: credential.key.value,
-                isPid: id == .mDocPid,
-                docTypeIdentifier: id
-              )
+          do {
+            let metadata = try await self.wallet.getIssuerMetadata(issuerName: issuerName)
+            return .success(
+              metadata.credentialsSupported.compactMap { credential in
+                switch credential.value {
+                case .msoMdoc(let config):
+                  let id = DocumentTypeIdentifier(rawValue: config.docType)
+                  return ScopedDocument(
+                    name: config.credentialMetadata?.display.getName(fallback: credential.key.value) ?? credential.key.value,
+                    issuer: metadata.credentialIssuerIdentifier.url.host.ifNilOrEmpty { issuerName },
+                    order: orderedVciConfig.order,
+                    configId: credential.key.value,
+                    isPid: id == .mDocPid,
+                    docTypeIdentifier: id
+                  )
 
-            case .sdJwtVc(let config):
-              guard let vct = config.vct else { return nil }
-              let id = DocumentTypeIdentifier(rawValue: vct)
-              return ScopedDocument(
-                name: config.credentialMetadata?.display.getName(fallback: credential.key.value) ?? credential.key.value,
-                issuer: metadata.credentialIssuerIdentifier.url.host.ifNilOrEmpty { issuerName },
-                order: orderedVciConfig.order,
-                configId: credential.key.value,
-                isPid: id == .sdJwtPid,
-                docTypeIdentifier: id
-              )
+                case .sdJwtVc(let config):
+                  guard let vct = config.vct else { return nil }
+                  let id = DocumentTypeIdentifier(rawValue: vct)
+                  return ScopedDocument(
+                    name: config.credentialMetadata?.display.getName(fallback: credential.key.value) ?? credential.key.value,
+                    issuer: metadata.credentialIssuerIdentifier.url.host.ifNilOrEmpty { issuerName },
+                    order: orderedVciConfig.order,
+                    configId: credential.key.value,
+                    isPid: id == .sdJwtPid,
+                    docTypeIdentifier: id
+                  )
 
-            default:
-              return nil
-            }
+                default:
+                  return nil
+                }
+              }
+            )
+          } catch {
+            return .failure(error)
           }
         }
       }
 
       var documents: [ScopedDocument] = []
-      for try await docs in group {
-        documents.append(contentsOf: docs)
+      var errors: [Error] = []
+      for await result in group {
+        switch result {
+        case .success(let docs): documents.append(contentsOf: docs)
+        case .failure(let error): errors.append(error)
+        }
       }
-      return documents
+      return ScopedDocumentsResult(
+        documents: documents,
+        errors: errors,
+        totalIssuers: issuersConfig.count
+      )
     }
   }
 
@@ -449,10 +766,131 @@ final actor WalletKitControllerImpl: WalletKitController {
       return false
     }
   }
+  func getIssuerRegistration(for offer: OfferedIssuanceModel) async -> IssuerRegistration? {
+    makeIssuerRegistration(
+      policy: offer.wrpVciRegistrationPolicy,
+      warnings: offer.wrpVciWarnings
+    )
+  }
+
+  func getIssuerRegistration(issuerId: String, configIds: [String]) async throws -> IssuerRegistration? {
+    guard isRegistrationChecked else { return nil }
+    do {
+      let response = try await wallet.resolveIssuerRegistration(
+        issuerName: issuerId,
+        credentialConfigurationIds: configIds
+      )
+      return makeIssuerRegistration(
+        policy: response.wrpIssuerPolicy,
+        warnings: response.wrpIssuerWarnings
+      )
+    } catch {
+      if error.isTrustBlocked { return .blocked(reason: .notRegisteredAsProvider) }
+      throw error
+    }
+  }
+
+  func getVerifierRegistrationForFailedRequest() async -> RelyingPartyRegistration? {
+
+    guard let policy = await wallet.wrpRegistrationValidator.wrpVpRegistrationPolicy else {
+      return nil
+    }
+
+    return makeVerifierRegistration(
+      policy: policy,
+      trustViolations: [],
+      overaskedClaims: [],
+      verifierName: nil,
+      verifierIsTrusted: false
+    )
+  }
 
   func getDocumentCategories() -> DocumentCategories {
     let sorted = walletKitConfig.documentsCategories.sorted { $0.key.order < $1.key.order }
     return DocumentCategories(uniqueKeysWithValues: sorted)
+  }
+
+  func getVerifierRegistration(
+    policy: WrpRegistrationPolicy?,
+    trustViolations: [String],
+    overaskedClaims: [OveraskedClaim],
+    verifierName: String?,
+    verifierIsTrusted: Bool,
+    isNotBoundToRequester: Bool,
+    transactionIdentifier: String
+  ) async -> RelyingPartyRegistration {
+    let registration = makeVerifierRegistration(
+      policy: policy,
+      trustViolations: trustViolations,
+      overaskedClaims: overaskedClaims,
+      verifierName: verifierName,
+      verifierIsTrusted: verifierIsTrusted
+    )
+    await registrationCheckProvider.record(
+      RecordedRegistrationCheck(
+        status: registration.registration,
+        isNotBoundToRequester: isNotBoundToRequester,
+        isRequesterAuthenticated: verifierIsTrusted
+      ),
+      for: transactionIdentifier
+    )
+    return registration
+  }
+
+  /// The outcome is recorded for the history entry wallet-kit writes when the presentation ends, as on Android.
+  private func makeVerifierRegistration(
+    policy: WrpRegistrationPolicy?,
+    trustViolations: [String],
+    overaskedClaims: [OveraskedClaim],
+    verifierName: String?,
+    verifierIsTrusted: Bool
+  ) -> RelyingPartyRegistration {
+
+    let unregistered = RelyingPartyRegistration(
+      name: verifierName,
+      uniqueId: nil,
+      isVerified: verifierIsTrusted,
+      logoUrl: nil,
+      registration: .notSupported
+    )
+
+    guard isRegistrationChecked else { return unregistered }
+
+    guard let policy else {
+      return trustViolations.isEmpty ? unregistered : RelyingPartyRegistration(
+        name: verifierName,
+        uniqueId: nil,
+        isVerified: verifierIsTrusted,
+        logoUrl: nil,
+        registration: .notVerified(details: nil)
+      )
+    }
+
+    let privacyPolicyUrl = policy.privacyPolicy.flatMap { URL(string: $0) }
+
+    let subjectDetails = RegistrationDetails(
+      tradeName: policy.name ?? policy.sub,
+      uniqueId: policy.sub,
+      logoUrl: nil,
+      intendedUse: policy.purpose?.localizedValue,
+      privacyPolicyUrl: privacyPolicyUrl,
+      serviceDescription: policy.srvDescription?.localizedValue
+    )
+
+    let status: RegistrationStatus = trustViolations.isEmpty
+    ? .verified(details: subjectDetails, overaskedClaims: overaskedClaims)
+    : .notVerified(details: subjectDetails)
+
+    return RelyingPartyRegistration(
+      name: status.resolveRequesterName(
+        registrationName: policy.name,
+        accessCertificateName: verifierName
+      ),
+      uniqueId: policy.sub,
+      isVerified: verifierIsTrusted,
+      logoUrl: nil,
+      registration: status
+    )
   }
 
   func isDocumentBookmarked(with id: String) async -> Bool {
@@ -467,58 +905,149 @@ final actor WalletKitControllerImpl: WalletKitController {
     try await bookmarkStorageController.delete(id)
   }
 
-  func fetchTransactionLog(with id: String) async throws -> TransactionLogItem {
+  func fetchTransactionLog(with id: String) async throws -> TransactionLogDomain {
     guard
       let storedLog = try? await self.transactionLogStorageController.retrieve(id),
-      let item = try? storedLog.toTransactionLogItem(
-        id: storedLog.identifier,
-        parse: { self.wallet.parseTransactionLog($0) }
+      let log = storedLog.toTransactionLogDomain(
+        transactionDataTypes: walletKitConfig.supportedTransactionDataTypes
       )
     else {
       throw WalletCoreError.unableToFetchTransactionLog
     }
-    return item
+    return log
   }
 
-  func fetchTransactionLogs() async throws -> [TransactionLogItem] {
+  func deleteAllRecords() async throws {
+    try await transactionLogStorageController.deleteAll()
+    try await bookmarkStorageController.deleteAll()
+    try await revokedDocumentStorageController.deleteAll()
+    try await failedReIssuedDocStorageController.deleteAll()
+    try await statusRefreshFailureStorageController.deleteAll()
+    try await storageEraseController.eraseStore()
+  }
+
+  func fetchTransactionLogRevision() async -> String {
+    await transactionLogStorageController.retrieveRevision()
+  }
+
+  func fetchTransactionLogs() async throws -> [TransactionLogDomain] {
     guard
       let storedLogs = try? await self.transactionLogStorageController.retrieveAll()
     else {
       throw WalletCoreError.unableToFetchTransactionLog
     }
-    return storedLogs.compactMap {
+    var logs: [TransactionLogDomain] = []
+    for storedLog in storedLogs {
+      guard let entry = storedLog.toTransactionEntry() else {
+        try? await self.transactionLogStorageController.delete(storedLog.identifier)
+        continue
+      }
       guard
-        let item = try? $0.toTransactionLogItem(
-          id: $0.identifier,
-          parse: { self.wallet.parseTransactionLog($0) }
+        let log = entry.toTransactionLogDomain(
+          id: storedLog.identifier,
+          parentPresentationId: storedLog.parentPresentationId,
+          transactionDataTypes: walletKitConfig.supportedTransactionDataTypes
         )
       else {
-        return nil
+        continue
       }
-      return item
+      logs.append(log)
     }
+    return logs
   }
 
-  func fetchRevokedDocuments() async throws -> [String] {
-    return try await self.revokedDocumentStorageController.retrieveAll().map {
-      return $0.identifier
+  func deleteTransactionLog(with id: String) async throws {
+    let actions = (try? await self.transactionLogStorageController.retrieve(parentPresentationId: id)) ?? []
+    for action in actions {
+      try await self.transactionLogStorageController.delete(action.identifier)
     }
+    try await self.transactionLogStorageController.delete(id)
   }
 
-  func storeRevokedDocuments(with ids: [String]) async throws {
-    try await revokedDocumentStorageController.store(ids.map { .init(identifier: $0) })
+  func fetchPresentationActions(parentPresentationId: String) async throws -> [TransactionLogDomain] {
+    let storedActions = try await self.transactionLogStorageController.retrieve(parentPresentationId: parentPresentationId)
+    return storedActions
+      .compactMap { $0.toTransactionLogDomain() }
+      .filter { $0.parentPresentationId == parentPresentationId }
+      .sorted { $0.time > $1.time }
+  }
+
+  func recordDataDeletionRequest(for presentation: TransactionLogDomain.Presentation, contactUrl: URL) async throws {
+    try await recordPresentationAction(
+      parentPresentationId: presentation.id,
+      entry: presentation.toDataDeletionRequestEntry(id: UUID().uuidString, time: Date()),
+      channel: TransactionActionChannel(url: contactUrl)
+    )
+  }
+
+  func recordDpaReport(for presentation: TransactionLogDomain.Presentation, contactUrl: URL) async throws {
+    try await recordPresentationAction(
+      parentPresentationId: presentation.id,
+      entry: presentation.toDpaReportEntry(id: UUID().uuidString, time: Date()),
+      channel: TransactionActionChannel(url: contactUrl)
+    )
+  }
+
+  private func recordPresentationAction(
+    parentPresentationId: String,
+    entry: TransactionEntry,
+    channel: TransactionActionChannel?
+  ) async throws {
+    guard
+      !parentPresentationId.isEmpty,
+      parentPresentationId != entry.transactionIdentifier,
+      let parent = try? await self.transactionLogStorageController.retrieve(parentPresentationId),
+      parent.parentPresentationId == nil,
+      case .presentation? = parent.toTransactionEntry()
+    else {
+      throw WalletCoreError.unableToRecordTransactionAction
+    }
+    try await self.transactionLogStorageController.store(
+      entry.toTransactionLogStorage(parentPresentationId: parentPresentationId, actionChannel: channel)
+    )
+  }
+
+  func fetchRevokedDocumentStatuses() async throws -> [String: DocumentRevocationStatus] {
+    try await revokedDocumentStorageController.retrieveRevocationStatuses()
+  }
+
+  func storeRevokedDocuments(with statuses: [String: DocumentRevocationStatus]) async throws {
+    try await revokedDocumentStorageController.store(
+      statuses.map { .init(identifier: $0.key, status: $0.value.rawValue) }
+    )
+    await reconcileRegistrations()
   }
 
   func removeRevokedDocument(with id: String) async throws {
     try await revokedDocumentStorageController.delete(id)
+    await reconcileRegistrations()
   }
 
-  func isDocumentRevoked(with id: String) async -> Bool {
-    return (try? await revokedDocumentStorageController.retrieve(id)) != nil
+  func fetchStatusRefreshFailures() async throws -> Set<String> {
+    try await statusRefreshFailureStorageController.retrieveIdentifiers()
   }
 
-  func getDocumentStatus(for statusIdentifier: StatusIdentifier) async throws -> CredentialStatus {
-    return try await wallet.getDocumentStatus(for: statusIdentifier)
+  func storeStatusRefreshFailures(ids: [String]) async throws {
+    try await statusRefreshFailureStorageController.store(ids.map { StatusRefreshFailure(identifier: $0) })
+  }
+
+  func removeStatusRefreshFailures(ids: [String]) async throws {
+    for id in ids {
+      try await statusRefreshFailureStorageController.delete(id)
+    }
+  }
+
+  func hasStatusRefreshFailure(with id: String) async -> Bool {
+    (try? await statusRefreshFailureStorageController.retrieve(id)) != nil
+  }
+
+  func getDocumentRevocationStatus(with id: String) async -> DocumentRevocationStatus? {
+    guard let record = try? await revokedDocumentStorageController.retrieve(id) else { return nil }
+    return record.revocationStatus
+  }
+
+  func getDocumentStatus(for statusList: MdocDataModel18013.StatusList) async throws -> CredentialStatus {
+    return try await wallet.getDocumentStatus(for: statusList)
   }
 
   func storeFailedReIssuedDocuments(ids: [String]) async throws {
@@ -529,40 +1058,77 @@ final actor WalletKitControllerImpl: WalletKitController {
     try await failedReIssuedDocStorageController.deleteAll()
   }
 
+  func hasReIssuanceFailure(with id: String) async -> Bool {
+    (try? await failedReIssuedDocStorageController.retrieve(id)) != nil
+  }
+
   func refreshUsageCounters() async throws {
     try await wallet.refreshUsageCounters()
   }
 }
 
-private extension WalletKitControllerImpl {
+extension WalletKitControllerImpl {
 
-  func registerForDocumentIdentityExtension(documents: [any DocClaimsDecodable]) {
-    Task {
-      for document in documents {
-        do {
-          if #available(iOS 26.0, *), document.docDataFormat == .cbor {
-            try await documentRegistrationManager.addRegistration(
-              mobileDocumentType: document.docType,
-              supportedAuthorityKeyIdentifiers: [],
-              documentIdentifier: document.id,
-              invalidationDate: document.validUntil
-            )
-          }
-        } catch {
-          throw WalletCoreError.unableFetchDocuments
-        }
+  func issuerLogoOrigins() -> IssuerLogoOrigins {
+    IssuerLogoOrigins(
+      logoOriginsByIssuer: Dictionary(
+        walletKitConfig.issuersConfig.values.compactMap { vciConfig in
+          vciConfig.config.credentialIssuerURL.map { ($0, vciConfig.logoOrigins) }
+        },
+        uniquingKeysWith: +
+      )
+    )
+  }
+
+  /// Deletes the log file a debug build or an earlier build left, as the Android wallet does.
+  static func removeLogFileOfAnEarlierBuild() {
+    guard let url = try? EudiWallet.getLogFileURL(WalletKitConfigImpl.debugLogFileName) else { return }
+    try? FileManager.default.removeItem(at: url)
+  }
+
+  /// Registers the issued CBOR documents for the Digital Credential API, leaving out every document with a
+  /// revocation record (revoked, suspended or unrecognised), as the Android wallet does. When the records cannot be
+  /// read, or the user has turned the offering off, nothing is registered.
+  /// Passes run one at a time (`SerialCheckRunner`): a call during a pass makes it run once more, and the call
+  /// returns when no pass is left, so an earlier pass cannot register documents after the one that withdrew them.
+  func reconcileRegistrations() async {
+    await registrationRunner.run { await self.reconcileRegistrationsOnce() }
+    await registrationRunner.waitUntilIdle()
+  }
+
+  private func reconcileRegistrationsOnce() async {
+    let blocked = try? await fetchRevokedDocumentStatuses()
+    let candidates = fetchIssuedDocuments()
+      .filter { $0.docDataFormat == .cbor }
+      .map {
+        RegistrationDescriptor(
+          documentIdentifier: $0.id,
+          mobileDocumentType: $0.docType,
+          invalidationDate: $0.validUntil
+        )
       }
-    }
+    await documentRegistrationManager.reconcile(
+      desired: Self.registrationDescriptors(
+        candidates: candidates,
+        blockedDocumentIds: blocked.map { Set($0.keys) },
+        isOffering: prefsController.getBool(forKey: .offerDocumentsToApps)
+      )
+    )
   }
 
-  func removeAllRegistration(with ids: [String]?) async {
-    if #available(iOS 26.0, *) {
-      guard let ids else { return }
-      do {
-        try await documentRegistrationManager.removeRegistration(documentIdentifiers: ids)
-      } catch {}
-    } else {}
+  /// The candidates without a revocation record; none while the offering is off or when the records could not be
+  /// read (`blockedDocumentIds` is nil).
+  static func registrationDescriptors(
+    candidates: [RegistrationDescriptor],
+    blockedDocumentIds: Set<String>?,
+    isOffering: Bool
+  ) -> [RegistrationDescriptor] {
+    guard isOffering, let blockedDocumentIds else { return [] }
+    return candidates.filter { !blockedDocumentIds.contains($0.documentIdentifier) }
   }
+}
+
+private extension WalletKitControllerImpl {
 
   func decodeDeeplink(link: URLComponents) -> String? {
     link.removeSchemeFromComponents()?.string
@@ -573,6 +1139,8 @@ private extension WalletKitControllerImpl {
 
     let data = urlString.data(using: .utf8) ?? Data()
 
+    wallet.openID4VpConfig = openID4VpConfig
+
     let session = await wallet.beginPresentation(flow: .openid4vp(qrCode: data))
     let remoteSessionCoordinator = DIGraph.shared.resolver.force(
       RemoteSessionCoordinator.self,
@@ -580,124 +1148,5 @@ private extension WalletKitControllerImpl {
     )
     await self.sessionCoordinatorHolder.setActiveRemoteCoordinator(remoteSessionCoordinator)
     return remoteSessionCoordinator
-  }
-}
-
-extension WalletKitController {
-
-  private func parseChildren(
-    docId: String,
-    groupId: String,
-    docClaims: [DocClaim],
-    type: DocumentElementType,
-    parser: (String) -> String,
-    claims: inout [DocumentElementClaim]
-  ) {
-    docClaims.forEach { claim in
-      let docElementClaim = parseDocClaim(
-        docId: docId,
-        groupId: groupId,
-        docClaim: claim,
-        type: type,
-        parser: parser
-      )
-      claims.append(contentsOf: docElementClaim)
-    }
-  }
-
-  public func parseDocClaim(
-    docId: String,
-    groupId: String,
-    docClaim: DocClaim,
-    type: DocumentElementType,
-    parser: (String) -> String
-  ) -> [DocumentElementClaim] {
-
-    func shouldGroup(_ title: String, _ children: [DocClaim]) -> Bool {
-      children.count > 1 && !title.isEmpty && children.allSatisfy { $0.children != nil }
-    }
-
-    if let children = docClaim.children, !children.isEmpty {
-
-      let title = docClaim.displayName.ifNilOrEmpty { docClaim.name }
-
-      if shouldGroup(title, children) {
-
-        let grouped = children.enumerated().flatMap { index, entry in
-          let inner = entry.children ?? []
-
-          return [
-            DocumentElementClaim.group(
-              id: UUID().uuidString,
-              title: "\(title) \(index + 1)",
-              items: inner.flatMap {
-                parseDocClaim(
-                  docId: docId,
-                  groupId: groupId,
-                  docClaim: $0,
-                  type: type,
-                  parser: parser
-                )
-              }.sortByName()
-            )
-          ]
-        }
-
-        return [
-          .group(
-            id: UUID().uuidString,
-            title: title,
-            items: grouped
-          )
-        ]
-
-      } else {
-
-        let childClaims = children.flatMap {
-          parseDocClaim(
-            docId: docId,
-            groupId: groupId,
-            docClaim: $0,
-            type: type,
-            parser: parser
-          )
-        }.sortByName()
-
-        return title.isEmpty
-        ? childClaims
-        : [
-          .group(
-            id: UUID().uuidString,
-            title: title,
-            items: childClaims
-          )
-        ]
-      }
-    }
-
-    var value: DocumentElementValue {
-      if let image = docClaim.dataValue.image {
-        return .image(Image(uiImage: image))
-      } else {
-        let claim = docClaim
-          .parseDate(parser: parser)
-          .parseUserPseudonym()
-        return .string(claim.stringValue)
-      }
-    }
-
-    let groupIdentifier: String = groupId
-    return [
-      .primitive(
-        id: groupIdentifier,
-        title: docClaim.displayName.ifNilOrEmpty { docClaim.name },
-        documentId: docId,
-        nameSpace: docClaim.namespace,
-        path: docClaim.path,
-        type: type,
-        value: value,
-        status: .available(isRequired: false)
-      )
-    ]
   }
 }

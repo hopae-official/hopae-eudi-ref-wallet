@@ -16,14 +16,38 @@
 import Foundation
 import logic_business
 import EudiWalletKit
-import Security
+import EudiEtsi1196x2
+import MdocDataModel18013
+import struct OpenID4VP.SupportedTransactionDataType
 
 protocol WalletKitConfig: Sendable {
 
   /**
-   * VCI Configuration
+   * VCI Configuration, keyed by issuer host.
+   *
+   * `allowPlainJwtProof` is set per issuer and defaults to `false`, which keeps the HAIP-compliant
+   * proof policy: only attested proofs (`attestation`, or `jwt` with key attestation) are sent.
+   * Set it to `true` only for an issuer that does not support key attestation and requires a plain
+   * JWT proof; the proof is then bound to a key without wallet attestation, using ES256/ES384/ES512.
+   *
+   * `encryptionSupportConfig` is set per issuer and keeps wallet-kit's default: with
+   * `credentialResponseEncryptionPolicy` `.supported`, the credential request and response are
+   * encrypted whenever the issuer's metadata advertises encryption, and sent in plain JSON over TLS
+   * otherwise. Set it to `.required` to refuse an issuer that does not support encryption.
+   * `ecConfig`, `rsaConfig` and `supportedEncryptionMethods` restrict the key types and methods used.
    */
   var issuersConfig: [String: VciConfig] { get }
+
+  /**
+   * Whether the issuer's WRP registration certificate (WRPRC), delivered in the issuer metadata
+   * `issuer_info`, is validated during issuance.
+   *
+   * Requires `trustConfiguration.requireSignedMetadata`, which supplies the WRPAC the certificate
+   * is bound to. Note that a missing WRPRC is a hard failure in the OpenID4VCI library, not a
+   * warning: enabling this against an issuer that does not publish `issuer_info` fails every
+   * issuance.
+   */
+  var validateIssuerRegistrationCertificate: Bool { get }
 
   /**
    * VP Configuration
@@ -31,9 +55,22 @@ protocol WalletKitConfig: Sendable {
   var vpConfig: OpenId4VpConfiguration { get }
 
   /**
-   * Reader Configuration
+   * Transaction data types the wallet accepts in an OpenID4VP request.
+   *
+   * The OpenID4VP library rejects any request carrying `transaction_data` whose type is not
+   * listed here, so an empty list rejects every request with transaction data.
    */
-  var trustedReaderRootCertificates: [x5chain] { get }
+  var supportedTransactionDataTypes: [SupportedTransactionDataType] { get }
+
+  /**
+   * Trust configuration: ETSI LoTE (List of Trusted Entities) trust sources,
+   * verification-context mappings and trust policies used for reader / issuer validation.
+   *
+   * `revocationPolicy` is set on both trust sources, so that a library default does not change it:
+   * `.disabled` for the development trust lists, `.ocspOnly` for the static fallback. Choose a
+   * policy for production; see GO_LIVE Trust Store.
+   */
+  var trustConfiguration: TrustConfiguration { get }
 
   /**
    * User authentication required accessing core's secure storage
@@ -45,10 +82,10 @@ protocol WalletKitConfig: Sendable {
    */
   var keyOptions: KeyOptions? { get }
 
-  /**
-   * The name of the file to be created to store logs
-   */
-  var logFileName: String { get }
+  /// The name of the file wallet-kit stores its logs in, written only by debug builds: wallet-kit logs
+  /// authorization codes, access tokens and issued credentials to it, as the Android wallet's release builds write
+  /// no log file.
+  var logFileName: String? { get }
 
   /**
    * Document categories
@@ -65,10 +102,20 @@ protocol WalletKitConfig: Sendable {
    */
   var revocationIntervalSeconds: TimeInterval { get }
 
+  /// How long the factory reset waits for a background check under way to finish before it gives up without
+  /// deleting anything, as the Android wallet's `workerStopTimeout`.
+  var workerStopTimeoutSeconds: TimeInterval { get }
+
   /**
    * Configuration for document issuance, including default rules and specific overrides.
    */
   var documentIssuanceConfig: DocumentIssuanceConfig { get }
+
+  /**
+   * Provides the information used to display the wallet's Trust Mark and link to its
+   * certification page and the list of certified wallets.
+   */
+  var trustMarkSource: TrustMarkSource { get }
 }
 
 struct WalletKitConfigImpl: WalletKitConfig {
@@ -76,15 +123,18 @@ struct WalletKitConfigImpl: WalletKitConfig {
   let configLogic: ConfigLogic
   let transactionLoggerImpl: TransactionLogger
   let walletKitAttestationProvider: WalletKitAttestationProvider
+  let prefsController: PrefsController
 
   init(
     configLogic: ConfigLogic,
     transactionLogger: TransactionLogger,
-    walletKitAttestationProvider: WalletKitAttestationProvider
+    walletKitAttestationProvider: WalletKitAttestationProvider,
+    prefsController: PrefsController
   ) {
     self.configLogic = configLogic
     self.transactionLoggerImpl = transactionLogger
     self.walletKitAttestationProvider = walletKitAttestationProvider
+    self.prefsController = prefsController
   }
 
   var userAuthenticationRequired: Bool {
@@ -95,8 +145,12 @@ struct WalletKitConfigImpl: WalletKitConfig {
     KeyOptions(
       curve: .P256,
       secureAreaName: SecureEnclaveSecureArea.name,
-      accessControl: []
+      accessControl: .empty
     )
+  }
+
+  var validateIssuerRegistrationCertificate: Bool {
+    prefsController.getBool(forKey: .validateIssuerRegistrationCertificate)
   }
 
   var issuersConfig: [String: VciConfig] {
@@ -108,26 +162,45 @@ struct WalletKitConfigImpl: WalletKitConfig {
           .init(
             config: .init(
               credentialIssuerURL: "https://issuer.eudiw.dev",
-              clientId: "wallet-dev",
-              keyAttestationsConfig: .init(walletAttestationsProvider: walletKitAttestationProvider),
+              clientId: "eudiw-abca",
+              keyAttestationsConfig: .init(
+                walletAttestationsProvider: walletKitAttestationProvider,
+                popKeyOptions: KeyOptions(
+                  secureAreaName: SecureEnclaveSecureArea.name,
+                  accessControl: .empty
+                )
+              ),
               authFlowRedirectionURI: URL(string: "eu.europa.ec.euidi://authorization")!,
               parUsage: .required(authorizationCodeDPoPBinding: true),
+              allowPlainJwtProof: false,
               requireDpop: true,
-              cacheIssuerMetadata: true
+              issuerMetadataPolicy: trustConfiguration.issuerMetadataPolicy,
+              validateRegistrationCertificate: validateIssuerRegistrationCertificate,
+              encryptionSupportConfig: .init(credentialResponseEncryptionPolicy: .supported)
             ),
             order: 1
           ),
           .init(
             config: .init(
               credentialIssuerURL: "https://issuer-backend.eudiw.dev",
-              clientId: "wallet-dev",
-              keyAttestationsConfig: .init(walletAttestationsProvider: walletKitAttestationProvider),
+              clientId: "eudiw-abca",
+              keyAttestationsConfig: .init(
+                walletAttestationsProvider: walletKitAttestationProvider,
+                popKeyOptions: KeyOptions(
+                  secureAreaName: SecureEnclaveSecureArea.name,
+                  accessControl: .empty
+                )
+              ),
               authFlowRedirectionURI: URL(string: "eu.europa.ec.euidi://authorization")!,
               parUsage: .required(authorizationCodeDPoPBinding: true),
+              allowPlainJwtProof: false,
               requireDpop: true,
-              cacheIssuerMetadata: true
+              issuerMetadataPolicy: trustConfiguration.issuerMetadataPolicy,
+              validateRegistrationCertificate: validateIssuerRegistrationCertificate,
+              encryptionSupportConfig: .init(credentialResponseEncryptionPolicy: .supported)
             ),
-            order: 0
+            order: 0,
+            logoOrigins: ["https://eudiw.dev"]
           )
         ]
       case .DEV:
@@ -135,26 +208,45 @@ struct WalletKitConfigImpl: WalletKitConfig {
           .init(
             config: .init(
               credentialIssuerURL: "https://ec.dev.issuer.eudiw.dev",
-              clientId: "wallet-dev",
-              keyAttestationsConfig: .init(walletAttestationsProvider: walletKitAttestationProvider),
+              clientId: "eudiw-abca",
+              keyAttestationsConfig: .init(
+                walletAttestationsProvider: walletKitAttestationProvider,
+                popKeyOptions: KeyOptions(
+                  secureAreaName: SecureEnclaveSecureArea.name,
+                  accessControl: .empty
+                )
+              ),
               authFlowRedirectionURI: URL(string: "eu.europa.ec.euidi://authorization")!,
               parUsage: .required(authorizationCodeDPoPBinding: true),
+              allowPlainJwtProof: false,
               requireDpop: true,
-              cacheIssuerMetadata: true
+              issuerMetadataPolicy: trustConfiguration.issuerMetadataPolicy,
+              validateRegistrationCertificate: validateIssuerRegistrationCertificate,
+              encryptionSupportConfig: .init(credentialResponseEncryptionPolicy: .supported)
             ),
             order: 1
           ),
           .init(
             config: .init(
               credentialIssuerURL: "https://dev.issuer-backend.eudiw.dev",
-              clientId: "wallet-dev",
-              keyAttestationsConfig: .init(walletAttestationsProvider: walletKitAttestationProvider),
+              clientId: "eudiw-abca",
+              keyAttestationsConfig: .init(
+                walletAttestationsProvider: walletKitAttestationProvider,
+                popKeyOptions: KeyOptions(
+                  secureAreaName: SecureEnclaveSecureArea.name,
+                  accessControl: .empty
+                )
+              ),
               authFlowRedirectionURI: URL(string: "eu.europa.ec.euidi://authorization")!,
               parUsage: .required(authorizationCodeDPoPBinding: true),
+              allowPlainJwtProof: false,
               requireDpop: true,
-              cacheIssuerMetadata: true
+              issuerMetadataPolicy: trustConfiguration.issuerMetadataPolicy,
+              validateRegistrationCertificate: validateIssuerRegistrationCertificate,
+              encryptionSupportConfig: .init(credentialResponseEncryptionPolicy: .supported)
             ),
-            order: 0
+            order: 0,
+            logoOrigins: ["https://eudiw.dev"]
           )
         ]
       }
@@ -176,12 +268,61 @@ struct WalletKitConfigImpl: WalletKitConfig {
 
   var vpConfig: OpenId4VpConfiguration {
     .init(
-      clientIdSchemes: [.x509SanDns, .x509Hash]
+      clientIdSchemes: [.x509SanDns, .x509Hash],
+      supportedTransactionDataTypes: supportedTransactionDataTypes,
+      validateRegistrationCertificate: validateIssuerRegistrationCertificate
     )
   }
 
-  var trustedReaderRootCertificates: [x5chain] {
-    let certificates = [
+  var supportedTransactionDataTypes: [SupportedTransactionDataType] {
+    [.qesApprovalRequest, .qesRequest]
+  }
+
+  var trustConfiguration: TrustConfiguration {
+    let loteLocations = SupportedLists<NSString>(
+      pidProviders: "https://trustedlist.serviceproviders.eudiw.dev/LOTE/json/PIDProviders.jwt",
+      walletProviders: nil,
+      wrpacProviders: "https://trustedlist.serviceproviders.eudiw.dev/LOTE/json/WRPACProviders.jwt",
+      wrprcProviders: "https://trustedlist.serviceproviders.eudiw.dev/LOTE/json/WRPRCProviders.jwt",
+      pubEaaProviders: "https://trustedlist.serviceproviders.eudiw.dev/LOTE/json/PubEAAProviders.jwt",
+      qeaProviders: nil,
+      eaaProviders: [:]
+    )
+
+    let classifications: EtsiContextTypeMappings = [
+      DocumentTypeIdentifier.mDocPid.rawValue: .pid,
+      DocumentTypeIdentifier.sdJwtPid.rawValue: .pid
+    ]
+
+    return TrustConfiguration(
+      trustSource: .etsi(
+        EtsiTrustSource(
+          loteLocations: loteLocations,
+          contextTypeMappings: classifications,
+          revocationPolicy: .disabled
+        )
+      ),
+      fallbackTrustSource: .staticList(
+        StaticListTrustSource(
+          rootCertificates: staticRootCertificates,
+          revocationPolicy: .ocspOnly
+        )
+      ),
+      defaultPolicy: .warning,
+      docTypePolicies: [
+        DocumentTypeIdentifier.mDocPid.rawValue: .enforce,
+        DocumentTypeIdentifier.sdJwtPid.rawValue: .enforce
+      ],
+      requireSignedMetadata: true,
+      statusTrustPolicy: .warning,
+      readerTrustPolicy: .enforce,
+      wrprcVpTrustPolicy: .warning,
+      wrprcVciTrustPolicy: .enforce
+    )
+  }
+
+  var staticRootCertificates: [Data] {
+    [
       "pidissuerca02_cz",
       "pidissuerca02_ee",
       "pidissuerca02_eu",
@@ -190,15 +331,20 @@ struct WalletKitConfigImpl: WalletKitConfig {
       "pidissuerca02_pt",
       "pidissuerca02_ut",
       "r45_staging"
-    ]
-    return certificates
-      .compactMap { loadCertificate($0) }
-      .map { [$0] }
+    ].compactMap { loadCertificate($0) }
   }
 
-  var logFileName: String {
-    return "eudi-ios-wallet-logs"
+  var logFileName: String? {
+    Self.logFileName(for: configLogic.appBuildType)
   }
+
+  /// The log file's name for `buildType`: debug builds only.
+  static func logFileName(for buildType: AppBuildType) -> String? {
+    buildType == .DEBUG ? debugLogFileName : nil
+  }
+
+  /// The log file's name in debug builds; a release build deletes a file of this name that an earlier build left.
+  static let debugLogFileName = "eudi-ios-wallet-logs"
 
   var documentsCategories: DocumentCategories {
     [
@@ -253,6 +399,10 @@ struct WalletKitConfigImpl: WalletKitConfig {
     300
   }
 
+  var workerStopTimeoutSeconds: TimeInterval {
+    30
+  }
+
   var documentIssuanceConfig: DocumentIssuanceConfig {
     return switch configLogic.appBuildVariant {
     case .DEMO:
@@ -297,14 +447,23 @@ struct WalletKitConfigImpl: WalletKitConfig {
       )
     }
   }
+
+  var trustMarkSource: TrustMarkSource {
+    .static(
+      information: TrustMarkInformation(
+        trustMarkResourceURL: "https://gist.githubusercontent.com/sraptis-scy/025334375fe26177d9a7bcb60fd8a93f/raw/TrustMarkResource.json",
+        listOfCertifiedWalletsURL: "https://eidas.ec.europa.eu/efda/wallet/certified",
+        walletSolutionInfoPageURL: "https://eidas.ec.europa.eu/efda/wallet/certified?id=WALLET_SOLUTION_ID"
+      )
+    )
+  }
 }
 
 private extension WalletKitConfigImpl {
-  func loadCertificate(_ name: String) -> SecCertificate? {
-    guard
-      let url = Bundle.main.url(forResource: name, withExtension: "der"),
-      let data = try? Data(contentsOf: url)
-    else { return nil }
-    return SecCertificateCreateWithData(nil, data as CFData)
+  func loadCertificate(_ name: String) -> Data? {
+    guard let url = Bundle.main.url(forResource: name, withExtension: "der") else {
+      return nil
+    }
+    return try? Data(contentsOf: url)
   }
 }

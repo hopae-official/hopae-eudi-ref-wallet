@@ -26,7 +26,9 @@ public final class FeatureCommonAssembly: Assembly {
       QuickPinInteractorImpl(
         pinStorageController: r.force(PinStorageController.self),
         pinThrottleController: r.force(PinThrottleController.self),
-        authenticationConfig: r.force(AuthenticationConfig.self)
+        authenticationConfig: r.force(AuthenticationConfig.self),
+        sessionController: r.force(SessionController.self),
+        deviceLockController: r.force(DeviceLockController.self)
       )
     }
     .inObjectScope(ObjectScope.transient)
@@ -46,6 +48,14 @@ public final class FeatureCommonAssembly: Assembly {
       ScannerInteractorImpl(
         formValidator: r.force(FormValidator.self),
         walletKitController: r.force(WalletKitController.self)
+      )
+    }
+    .inObjectScope(ObjectScope.transient)
+
+    container.register(TrustMarkInteractor.self) { r in
+      TrustMarkInteractorImpl(
+        walletKitTrustMarkController: r.force(WalletKitTrustMarkController.self),
+        prefsController: r.force(PrefsController.self)
       )
     }
     .inObjectScope(ObjectScope.transient)

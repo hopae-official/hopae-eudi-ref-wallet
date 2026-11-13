@@ -23,6 +23,9 @@ public struct RemoteImageView: View {
   let icon: Image?
   let width: Double?
   let height: Double?
+  let retryFailed: Bool
+  let onSuccess: ((CGSize) -> Void)?
+  let onFailure: (() -> Void)?
 
   private var getWidth: Double {
     guard let width = self.width else { return .infinity }
@@ -38,16 +41,26 @@ public struct RemoteImageView: View {
     url: URL?,
     icon: Image?,
     width: Double?,
-    height: Double?
+    height: Double?,
+    retryFailed: Bool = false,
+    onSuccess: ((CGSize) -> Void)? = nil,
+    onFailure: (() -> Void)? = nil
   ) {
     self.url = url
     self.icon = icon
     self.width = width
     self.height = height
+    self.retryFailed = retryFailed
+    self.onSuccess = onSuccess
+    self.onFailure = onFailure
   }
 
   public var body: some View {
-    WebImage(url: url) { image in
+    WebImage(
+      url: RemoteImagePolicy.loadableUrl(url),
+      options: retryFailed ? [.retryFailed] : [],
+      context: Self.loadingContext(for: url)
+    ) { image in
       image
         .resizable()
         .scaledToFit()
@@ -57,6 +70,12 @@ public struct RemoteImageView: View {
           .resizable()
           .scaledToFit()
       }
+    }
+    .onSuccess { image, _, _ in
+      onSuccess?(image.size)
+    }
+    .onFailure { _ in
+      onFailure?()
     }
     .indicator(.progress)
     .if(url != nil || icon != nil) { view in
@@ -82,5 +101,24 @@ public extension RemoteImageView {
         return false
       }
     }
+  }
+}
+
+extension RemoteImageView {
+
+  /// The downloader for remote images, whose operations keep to `RemoteImagePolicy`.
+  private static let imageDownloader: SDWebImageDownloader = {
+    let config = SDWebImageDownloaderConfig()
+    config.operationClass = RemoteImageDownloadOperation.self
+    return SDWebImageDownloader(config: config)
+  }()
+
+  /// Loads through `imageDownloader` and scales a large image down while decoding it.
+  static func loadingContext(for url: URL?) -> [SDWebImageContextOption: Any]? {
+    guard RemoteImagePolicy.loadableUrl(url) != nil else { return nil }
+    return [
+      .imageLoader: imageDownloader,
+      .imageScaleDownLimitBytes: RemoteImagePolicy.maxDecodedByteCount
+    ]
   }
 }

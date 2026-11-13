@@ -62,6 +62,7 @@
 			dstPath = "$(EXTENSIONS_FOLDER_PATH)";
 			dstSubfolderSpec = 16;
 			files = (
+				9F8701D02F6BE5BC00A865A9 /* EudiReferenceWalletIDProvider.appex in Embed ExtensionKit Extensions */,
 			);
 			name = "Embed ExtensionKit Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -293,6 +294,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				9F8701CF2F6BE5BC00A865A9 /* PBXTargetDependency */,
 			);
 			name = EudiWallet;
 			packageProductDependencies = (
@@ -469,14 +471,12 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_ENTITLEMENTS = EudiReferenceWalletIDProvider/EudiReferenceWalletIDProvider.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development: Stylianos Tzouvaras (XA5F8Z3QP7)";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Development: Stylianos Tzouvaras (XA5F8Z3QP7)";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = AZXQE7588Y;
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = AZXQE7588Y;
+				DEVELOPMENT_TEAM = P3A48743C4;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -498,7 +498,7 @@
 				INFOPLIST_FILE = EudiReferenceWalletIDProvider/WalletIdProvider.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = EudiReferenceWalletIDProvider;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -511,8 +511,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = eu.europa.ec.euidi.dev.EudiReferenceWalletIDProvider;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "EUDI DC-API Dev";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "EUDI DC-API Dev";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SHARED_APP_GROUP_IDENTIFIER = eu.europa.ec.euidi.dev;
 				SKIP_INSTALL = YES;
@@ -565,14 +564,12 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_ENTITLEMENTS = EudiReferenceWalletIDProvider/EudiReferenceWalletIDProvider.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development: Stylianos Tzouvaras (XA5F8Z3QP7)";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Development: Stylianos Tzouvaras (XA5F8Z3QP7)";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 18;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = AZXQE7588Y;
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = AZXQE7588Y;
+				DEVELOPMENT_TEAM = P3A48743C4;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -594,23 +591,22 @@
 				INFOPLIST_FILE = EudiReferenceWalletIDProvider/WalletIdProvider.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = EudiReferenceWalletIDProvider;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = yyyy.mm.v;
+				MARKETING_VERSION = 1.0.2;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = eu.europa.ec.euidi.EudiReferenceWalletIDProvider;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.hopae.eudi-ref-wallet.demo.EudiReferenceWalletIDProvider";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "EUDI DC-API";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "EUDI DC-API";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
-				SHARED_APP_GROUP_IDENTIFIER = eu.europa.ec.euidi;
+				SHARED_APP_GROUP_IDENTIFIER = "com.hopae.eudi-ref-wallet.demo";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -661,14 +657,12 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_ENTITLEMENTS = EudiReferenceWalletIDProvider/EudiReferenceWalletIDProvider.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Distribution: Netcompany-Intrasoft S.A. (AZXQE7588Y)";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution: Netcompany-Intrasoft S.A. (AZXQE7588Y)";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = AZXQE7588Y;
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = AZXQE7588Y;
+				DEVELOPMENT_TEAM = P3A48743C4;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -684,7 +678,7 @@
 				INFOPLIST_FILE = EudiReferenceWalletIDProvider/WalletIdProvider.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = EudiReferenceWalletIDProvider;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -696,8 +690,7 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = eu.europa.ec.euidi.dev.EudiReferenceWalletIDProvider;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "EUDI DC-API Dev Release";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "EUDI DC-API Dev Release";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SHARED_APP_GROUP_IDENTIFIER = eu.europa.ec.euidi.dev;
 				SKIP_INSTALL = YES;
@@ -750,14 +743,12 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_ENTITLEMENTS = EudiReferenceWalletIDProvider/EudiReferenceWalletIDProvider.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Distribution: Netcompany-Intrasoft S.A. (AZXQE7588Y)";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Distribution: Netcompany-Intrasoft S.A. (AZXQE7588Y)";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 18;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = AZXQE7588Y;
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = AZXQE7588Y;
+				DEVELOPMENT_TEAM = P3A48743C4;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -773,22 +764,21 @@
 				INFOPLIST_FILE = EudiReferenceWalletIDProvider/WalletIdProvider.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = EudiReferenceWalletIDProvider;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = yyyy.mm.v;
+				MARKETING_VERSION = 1.0.2;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = eu.europa.ec.euidi.EudiReferenceWalletIDProvider;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.hopae.eudi-ref-wallet.demo.EudiReferenceWalletIDProvider";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE_SPECIFIER = "EUDI DC-API Release";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "EUDI DC-API Release";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
-				SHARED_APP_GROUP_IDENTIFIER = eu.europa.ec.euidi;
+				SHARED_APP_GROUP_IDENTIFIER = "com.hopae.eudi-ref-wallet.demo";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -874,9 +864,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = EudiWallet.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 18;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_ASSET_PATHS = "Wallet/Preview\\ Content";
 				DEVELOPMENT_TEAM = P3A48743C4;
@@ -886,6 +877,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Wallet/Wallet.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = HopaeEudiWallet;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Bluetooth is used to share your identity documents in person";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Camera is used to scan QR codes for identity verification";
@@ -901,7 +893,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.hopae.eudi-ref-wallet.demo";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -979,9 +971,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = EudiWallet.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_ASSET_PATHS = "Wallet/Preview\\ Content";
 				DEVELOPMENT_TEAM = P3A48743C4;
 				ENABLE_PREVIEWS = YES;
@@ -990,6 +983,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Wallet/Wallet.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = HopaeEUDIWallet;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Bluetooth is used to share your identity documents in person";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Camera is used to scan QR codes for identity verification";
@@ -1005,7 +999,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.hopae.eudi-ref-wallet.demo";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1148,7 +1142,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 17;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_ASSET_PATHS = "Wallet/Preview\\ Content";
 				DEVELOPMENT_TEAM = P3A48743C4;
@@ -1158,6 +1152,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Wallet/Wallet.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "EUDI Wallet";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Bluetooth is used to share your identity documents in person";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Camera is used to scan QR codes for identity verification";
@@ -1173,7 +1168,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = eu.europa.ec.euidi.dev;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1197,7 +1192,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 17;
 				DEVELOPMENT_ASSET_PATHS = "Wallet/Preview\\ Content";
 				DEVELOPMENT_TEAM = P3A48743C4;
 				ENABLE_PREVIEWS = YES;
@@ -1206,6 +1201,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Wallet/Wallet.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "EUDI Wallet";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Bluetooth is used to share your identity documents in person";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Camera is used to scan QR codes for identity verification";
@@ -1221,7 +1217,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0.1;
+				MARKETING_VERSION = 1.0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = eu.europa.ec.euidi.dev;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1281,7 +1277,7 @@
 			repositoryURL = "https://github.com/eu-digital-identity-wallet/av-lib-ios-w3c-dc-api.git";
 			requirement = {
 				kind = exactVersion;
-				version = 0.20.1;
+				version = 0.28.2;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

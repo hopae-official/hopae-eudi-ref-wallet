@@ -90,6 +90,14 @@ struct DocumentDetailsView<Router: RouterHost>: View {
         }
       }
     )
+    .alertView(
+      isPresented: $viewModel.isTrustBlockedAlertShowing,
+      title: .issuanceBlockedTitle,
+      message: .issuanceBlockedMessage,
+      actions: {
+        Button(.close) { viewModel.isTrustBlockedAlertShowing = false }
+      }
+    )
     .task {
       await viewModel.fetchDocumentDetails()
     }
